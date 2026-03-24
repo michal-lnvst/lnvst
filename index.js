@@ -190,8 +190,6 @@ app.post('/webhook/contact', async (req, res) => {
 // ============================================
 
 function isSpam(message, email, name) {
-  if (!message) return true;
-
   const messageStr = (message || '').toLowerCase();
   const emailStr = (email || '').toLowerCase();
   const nameStr = (name || '').toLowerCase();
@@ -218,8 +216,9 @@ function isSpam(message, email, name) {
   const capsRatio = (messageStr.match(/[A-Z]/g) || []).length / (messageStr.length || 1);
   if (capsRatio > 0.5 && messageStr.length > 20) return true;
 
-  // Check message length (too short or suspiciously long)
-  if (messageStr.length < 5 || messageStr.length > 5000) return true;
+  // Message is optional, but if provided it should be reasonable length
+  if (messageStr.length > 0 && messageStr.length < 5) return true;
+  if (messageStr.length > 5000) return true;
 
   return false;
 }
