@@ -38,6 +38,16 @@ GETRESPONSE_LIST_ID_NEWSLETTER=your_newsletter_campaign_id_here
 GETRESPONSE_LIST_ID_CONTACTS=your_contact_leads_campaign_id_here
 ```
 
+Optional for additional contact data in GetResponse:
+
+```env
+GETRESPONSE_CUSTOM_FIELD_ID_COMPANY=
+GETRESPONSE_CUSTOM_FIELD_ID_PHONE=
+GETRESPONSE_CUSTOM_FIELD_ID_MESSAGE=
+```
+
+These IDs are `customFieldId` values from GetResponse custom fields. If set, the app maps form values (company, phone, message) into those fields.
+
 Optional for email notifications:
 
 ```env
@@ -155,6 +165,7 @@ Optional SMTP variables can be added later.
 - stores submission in SQLite
 - attempts email notification if SMTP is configured
 - attempts to add the contact to the GetResponse contacts list
+- optionally maps company/phone/message to GetResponse custom fields
 
 `POST /api/consent/log`
 

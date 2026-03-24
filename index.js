@@ -372,6 +372,9 @@ async function addContactToGetResponse(email, webflowData, listType = 'newslette
   try {
     // Extract name if available from Webflow data
     const name = extractNameFromWebflowData(webflowData);
+    const company = extractCompanyFromWebflowData(webflowData);
+    const phone = extractPhoneFromWebflowData(webflowData);
+    const message = extractMessageFromWebflowData(webflowData);
 
     // Prepare contact data for GetResponse
     const contactData = {
@@ -381,6 +384,36 @@ async function addContactToGetResponse(email, webflowData, listType = 'newslette
         campaignId: listId
       }
     };
+
+    const customFieldValues = [];
+    const companyFieldId = process.env.GETRESPONSE_CUSTOM_FIELD_ID_COMPANY;
+    const phoneFieldId = process.env.GETRESPONSE_CUSTOM_FIELD_ID_PHONE;
+    const messageFieldId = process.env.GETRESPONSE_CUSTOM_FIELD_ID_MESSAGE;
+
+    if (companyFieldId && company) {
+      customFieldValues.push({
+        customFieldId: companyFieldId,
+        value: [company]
+      });
+    }
+
+    if (phoneFieldId && phone) {
+      customFieldValues.push({
+        customFieldId: phoneFieldId,
+        value: [phone]
+      });
+    }
+
+    if (messageFieldId && message) {
+      customFieldValues.push({
+        customFieldId: messageFieldId,
+        value: [message]
+      });
+    }
+
+    if (customFieldValues.length > 0) {
+      contactData.customFieldValues = customFieldValues;
+    }
 
     // Make request to GetResponse API
     const response = await axios.post(
@@ -457,6 +490,58 @@ function extractMessageFromWebflowData(data) {
 
   for (const [key, value] of Object.entries(data)) {
     if ((key.toLowerCase().includes('message') || key.toLowerCase().includes('comment')) && typeof value === 'string') {
+      return value;
+    }
+  }
+
+  return '';
+}
+
+function extractCompanyFromWebflowData(data) {
+  if (!data || typeof data !== 'object') return '';
+
+  const companyFields = ['company', 'firma', 'organization', 'organisation', 'business'];
+
+  for (const field of companyFields) {
+    if (typeof data[field] === 'string') return data[field];
+  }
+
+  if (Array.isArray(data)) {
+    const companyField = data.find(
+      field => companyFields.includes(field.name?.toLowerCase())
+    );
+    if (companyField) return companyField.value;
+  }
+
+  for (const [key, value] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase();
+    if ((lowerKey.includes('company') || lowerKey.includes('firma')) && typeof value === 'string') {
+      return value;
+    }
+  }
+
+  return '';
+}
+
+function extractPhoneFromWebflowData(data) {
+  if (!data || typeof data !== 'object') return '';
+
+  const phoneFields = ['phone', 'telefon', 'telephone', 'mobile', 'phone_number'];
+
+  for (const field of phoneFields) {
+    if (typeof data[field] === 'string') return data[field];
+  }
+
+  if (Array.isArray(data)) {
+    const phoneField = data.find(
+      field => phoneFields.includes(field.name?.toLowerCase())
+    );
+    if (phoneField) return phoneField.value;
+  }
+
+  for (const [key, value] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase();
+    if ((lowerKey.includes('phone') || lowerKey.includes('telefon')) && typeof value === 'string') {
       return value;
     }
   }
