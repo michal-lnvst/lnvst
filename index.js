@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ============================================
 // DATABASE INITIALIZATION
@@ -135,7 +136,9 @@ app.post('/webhook/contact', async (req, res) => {
   try {
     console.log('Contact form submission received:', req.body);
 
-    const { email, name, message } = req.body;
+    const email = extractEmailFromWebflowData(req.body);
+    const name = extractNameFromWebflowData(req.body) || 'Anonymous';
+    const message = extractMessageFromWebflowData(req.body);
     const ipAddress = req.ip;
 
     // Validate email
@@ -154,7 +157,7 @@ app.post('/webhook/contact', async (req, res) => {
     db.run(
       `INSERT INTO contact_submissions (email, name, message, ip_address)
        VALUES (?, ?, ?, ?)`,
-      [email, name || 'Anonymous', message, ipAddress]
+      [email, name, message, ipAddress]
     );
     saveDatabase();
 
@@ -167,7 +170,7 @@ app.post('/webhook/contact', async (req, res) => {
 
     // Optionally add to GetResponse (contact leads list)
     try {
-      await addContactToGetResponse(email, { name, message }, 'contacts');
+      await addContactToGetResponse(email, { ...req.body, name, message }, 'contacts');
     } catch (err) {
       console.warn('Failed to add contact to GetResponse:', err.message);
       // Don't fail the request if GetResponse fails
@@ -327,6 +330,8 @@ function cleanupExpiredLogs() {
 // ============================================
 
 function extractEmailFromWebflowData(data) {
+  if (!data || typeof data !== 'object') return null;
+
   // Webflow form data structure varies - adapt based on your form fields
   // Common patterns:
   
@@ -409,8 +414,10 @@ async function addContactToGetResponse(email, webflowData, listType = 'newslette
 // ============================================
 
 function extractNameFromWebflowData(data) {
+  if (!data || typeof data !== 'object') return null;
+
   // Try common name fields
-  const nameFields = ['name', 'fullName', 'firstName'];
+  const nameFields = ['name', 'fullName', 'firstName', 'full_name', 'first_name'];
   
   for (const field of nameFields) {
     if (data[field]) return data[field];
@@ -424,7 +431,38 @@ function extractNameFromWebflowData(data) {
     if (nameField) return nameField.value;
   }
 
+  for (const [key, value] of Object.entries(data)) {
+    if (key.toLowerCase().includes('name') && typeof value === 'string') {
+      return value;
+    }
+  }
+
   return null;
+}
+
+function extractMessageFromWebflowData(data) {
+  if (!data || typeof data !== 'object') return '';
+
+  const messageFields = ['message', 'comments', 'comment', 'inquiry', 'enquiry', 'body'];
+
+  for (const field of messageFields) {
+    if (typeof data[field] === 'string') return data[field];
+  }
+
+  if (Array.isArray(data)) {
+    const messageField = data.find(
+      field => messageFields.includes(field.name?.toLowerCase())
+    );
+    if (messageField) return messageField.value;
+  }
+
+  for (const [key, value] of Object.entries(data)) {
+    if ((key.toLowerCase().includes('message') || key.toLowerCase().includes('comment')) && typeof value === 'string') {
+      return value;
+    }
+  }
+
+  return '';
 }
 
 // ============================================
