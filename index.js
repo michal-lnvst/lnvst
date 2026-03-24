@@ -385,7 +385,7 @@ async function addContactToGetResponse(email, webflowData, listType = 'newslette
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          'X-Auth-Token': `api-key ${apiKey}`
         }
       }
     );
