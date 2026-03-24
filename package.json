@@ -1,0 +1,24 @@
+{
+  "name": "webflow-getresponse-webhook",
+  "version": "1.0.0",
+  "description": "Webhook integration for Webflow newsletter form to GetResponse via Koyeb",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "keywords": ["webflow", "getresponse", "webhook", "koyeb"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "sql.js": "^1.8.0",
+    "nodemailer": "^6.9.7",
+    "validator": "^13.11.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
