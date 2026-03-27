@@ -12,7 +12,10 @@ Designed to be deployed on Koyeb and connected to Webflow forms.
 
 - `POST /webhook/newsletter`
 - `POST /webhook/contact`
-- `POST /api/consent/log`
+- `POST /api/consent/log` (legacy compatibility)
+- `POST /api/consent/preferences`
+- `POST /api/consent/withdraw`
+- `GET /api/consent/preferences/:consentId`
 - `GET /health`
 
 Legacy compatibility:
@@ -65,6 +68,13 @@ General:
 PORT=3000
 NODE_ENV=development
 DATABASE_PATH=./data/app.db
+
+# Browser access from Webflow domain(s)
+CORS_ALLOWED_ORIGINS=https://example.com,https://www.example.com
+
+# Consent retention and hashing
+CONSENT_RETENTION_MONTHS=12
+CONSENT_HASH_SALT=replace_with_random_secret
 ```
 
 Notes:
@@ -110,12 +120,20 @@ curl -X POST http://localhost:3000/webhook/contact \
   -d '{"email":"contact@example.com","name":"John Doe","message":"Hello"}'
 ```
 
-Consent log:
+Consent log (legacy endpoint):
 
 ```bash
 curl -X POST http://localhost:3000/api/consent/log \
   -H "Content-Type: application/json" \
   -d '{"userIdentifier":"user@example.com","consentType":"analytics","consentGiven":true}'
+```
+
+Consent preferences (new endpoint):
+
+```bash
+curl -X POST http://localhost:3000/api/consent/preferences \
+  -H "Content-Type: application/json" \
+  -d '{"consentId":"11111111-1111-1111-1111-111111111111","action":"save_preferences","preferences":{"analytics":true,"marketing":false,"personalization":false},"policyVersion":"2026-03","bannerVersion":"v1","consentSource":"webflow_modal"}'
 ```
 
 ## Webflow Setup
@@ -172,6 +190,45 @@ Optional SMTP variables can be added later.
 - stores consent decision in SQLite
 - sets 12-month expiration
 - expired records are cleaned up automatically
+
+`POST /api/consent/preferences`
+
+- stores full cookie preferences for categories: necessary, analytics, marketing, personalization
+- records consent metadata: action, policy version, banner version, locale, region
+- stores pseudonymous proof fields (IP, user agent, optional hashed user identifier)
+- returns normalized preferences that your frontend should enforce immediately
+
+`POST /api/consent/withdraw`
+
+- creates a consent event that revokes non-essential categories
+- should be available from privacy settings/footer at all times
+
+`GET /api/consent/preferences/:consentId`
+
+- returns latest non-expired preferences for a consent ID
+- useful for restoring settings when the user returns
+
+## GDPR Cookie Management (Webflow)
+
+Recommended UI model (matches your plan):
+
+- modal with two tabs:
+  - tab 1: summary and legal description
+  - tab 2: category toggles (granular controls)
+- global actions outside tabs: Accept all, Reject all, Save settings
+- permanent "Change cookie settings" link to reopen modal and withdraw consent
+
+Implementation playbook and copy-paste script:
+
+- see `docs/webflow-cookie-consent.md`
+
+Critical GDPR behavior rules:
+
+- do not load analytics/marketing scripts until user gives consent
+- Reject all must be as visible/easy as Accept all
+- category toggles must default to off (except necessary)
+- log policy/banner version with each consent action
+- allow withdrawal at any time with same effort as giving consent
 
 ## Current Caveat
 
