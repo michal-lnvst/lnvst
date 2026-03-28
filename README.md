@@ -75,6 +75,12 @@ CORS_ALLOWED_ORIGINS=https://example.com,https://www.example.com
 # Consent retention and hashing
 CONSENT_RETENTION_MONTHS=12
 CONSENT_HASH_SALT=replace_with_random_secret
+
+# Contact anti-spam (lightweight)
+CONTACT_MIN_SUBMIT_SECONDS=3
+CONTACT_RATE_LIMIT_WINDOW_MS=60000
+CONTACT_RATE_LIMIT_MAX=5
+CONTACT_HONEYPOT_FIELDS=company_fax
 ```
 
 Notes:
@@ -180,10 +186,32 @@ Optional SMTP variables can be added later.
 
 - validates email
 - applies basic spam filtering
+- applies lightweight anti-spam controls:
+  - honeypot hidden field check
+  - optional minimum form-fill time check
+  - per-IP rate limiting
 - stores submission in SQLite
 - attempts email notification if SMTP is configured
 - attempts to add the contact to the GetResponse contacts list
 - optionally maps company/phone/message to GetResponse custom fields
+
+### Contact Form Anti-Spam Setup (No CAPTCHA)
+
+Use this setup if you want low friction and can tolerate occasional spam.
+
+1. Add a hidden honeypot input in your Webflow contact form, for example `company_fax`.
+2. When the form loads, store a timestamp in a hidden input, for example `form_started_at`.
+3. Keep the defaults in `.env` (or tune):
+   - `CONTACT_MIN_SUBMIT_SECONDS=3`
+   - `CONTACT_RATE_LIMIT_WINDOW_MS=60000`
+   - `CONTACT_RATE_LIMIT_MAX=5`
+   - `CONTACT_HONEYPOT_FIELDS=company_fax`
+
+Backend behavior:
+
+- submissions with filled honeypot field are silently accepted but ignored
+- submissions faster than minimum threshold are silently accepted but ignored
+- bursts over rate limit return `429 Too Many Requests`
 
 `POST /api/consent/log`
 

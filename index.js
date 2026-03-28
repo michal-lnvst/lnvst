@@ -16,6 +16,15 @@ const CONSENT_RETENTION_MONTHS = Number(process.env.CONSENT_RETENTION_MONTHS || 
 const CONSENT_HASH_SALT = process.env.CONSENT_HASH_SALT || '';
 const CONSENT_ACTIONS = new Set(['accept_all', 'reject_all', 'save_preferences', 'withdraw']);
 const CONSENT_CATEGORIES = ['necessary', 'analytics', 'marketing', 'personalization'];
+const CONTACT_MIN_SUBMIT_SECONDS = Number(process.env.CONTACT_MIN_SUBMIT_SECONDS || 3);
+const CONTACT_RATE_LIMIT_WINDOW_MS = Number(process.env.CONTACT_RATE_LIMIT_WINDOW_MS || 60000);
+const CONTACT_RATE_LIMIT_MAX = Number(process.env.CONTACT_RATE_LIMIT_MAX || 5);
+const CONTACT_HONEYPOT_FIELDS = (process.env.CONTACT_HONEYPOT_FIELDS || 'company_fax')
+  .split(',')
+  .map(field => field.trim().toLowerCase())
+  .filter(Boolean);
+
+const contactRateLimitStore = new Map();
 
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .split(',')
@@ -183,10 +192,29 @@ app.post('/webhook/contact', async (req, res) => {
   try {
     console.log('Contact form submission received:', req.body);
 
+    const ipAddress = getClientIp(req);
+
+    const rateLimit = getContactRateLimitStatus(ipAddress);
+    if (rateLimit.limited) {
+      return res.status(429).json({
+        error: 'Too many submissions. Please try again later.',
+        retryAfterSeconds: rateLimit.retryAfterSeconds
+      });
+    }
+
+    if (isHoneypotTriggered(req.body)) {
+      console.warn(`Honeypot triggered from ${ipAddress}`);
+      return res.status(200).json({ success: true, message: 'Submission received' });
+    }
+
+    if (isSubmittedTooQuickly(req.body)) {
+      console.warn(`Submission rejected due to fast submit from ${ipAddress}`);
+      return res.status(200).json({ success: true, message: 'Submission received' });
+    }
+
     const email = extractEmailFromWebflowData(req.body);
     const name = extractNameFromWebflowData(req.body) || 'Anonymous';
     const message = extractMessageFromWebflowData(req.body);
-    const ipAddress = req.ip;
 
     // Validate email
     if (!email || !validator.isEmail(email)) {
@@ -235,6 +263,132 @@ app.post('/webhook/contact', async (req, res) => {
 // ============================================
 // SPAM FILTERING
 // ============================================
+
+function getContactRateLimitStatus(ipAddress) {
+  const now = Date.now();
+  const safeWindowMs = Number.isFinite(CONTACT_RATE_LIMIT_WINDOW_MS) && CONTACT_RATE_LIMIT_WINDOW_MS > 0
+    ? CONTACT_RATE_LIMIT_WINDOW_MS
+    : 60000;
+  const safeLimit = Number.isFinite(CONTACT_RATE_LIMIT_MAX) && CONTACT_RATE_LIMIT_MAX > 0
+    ? CONTACT_RATE_LIMIT_MAX
+    : 5;
+
+  // Keep this map small over time.
+  for (const [key, record] of contactRateLimitStore.entries()) {
+    if (now - record.windowStart > safeWindowMs * 2) {
+      contactRateLimitStore.delete(key);
+    }
+  }
+
+  const key = ipAddress || 'unknown';
+  const existing = contactRateLimitStore.get(key);
+
+  if (!existing || now - existing.windowStart > safeWindowMs) {
+    contactRateLimitStore.set(key, { count: 1, windowStart: now });
+    return { limited: false, retryAfterSeconds: 0 };
+  }
+
+  existing.count += 1;
+  contactRateLimitStore.set(key, existing);
+
+  if (existing.count > safeLimit) {
+    const remainingMs = Math.max(0, safeWindowMs - (now - existing.windowStart));
+    return {
+      limited: true,
+      retryAfterSeconds: Math.ceil(remainingMs / 1000)
+    };
+  }
+
+  return { limited: false, retryAfterSeconds: 0 };
+}
+
+function parseTimestampMs(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    // Treat values smaller than 1e12 as seconds.
+    return value < 1e12 ? value * 1000 : value;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    if (/^\d+$/.test(trimmed)) {
+      const numeric = Number(trimmed);
+      if (!Number.isFinite(numeric)) return null;
+      return numeric < 1e12 ? numeric * 1000 : numeric;
+    }
+
+    const parsed = Date.parse(trimmed);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  return null;
+}
+
+function extractStartedAtMs(data) {
+  if (!data || typeof data !== 'object') return null;
+
+  const startedAtKeys = [
+    'formStartedAt',
+    'form_started_at',
+    'startedAt',
+    'started_at',
+    'submittedFromTs',
+    'submitted_from_ts'
+  ];
+
+  for (const key of startedAtKeys) {
+    const parsed = parseTimestampMs(data[key]);
+    if (parsed) return parsed;
+  }
+
+  for (const [key, value] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase();
+    if ((lowerKey.includes('started') || lowerKey.includes('start_time')) && !lowerKey.includes('submit')) {
+      const parsed = parseTimestampMs(value);
+      if (parsed) return parsed;
+    }
+  }
+
+  return null;
+}
+
+function isSubmittedTooQuickly(data) {
+  if (CONTACT_MIN_SUBMIT_SECONDS <= 0) return false;
+
+  const startedAtMs = extractStartedAtMs(data);
+  if (!startedAtMs) return false;
+
+  const elapsedMs = Date.now() - startedAtMs;
+  if (elapsedMs < 0) return false;
+
+  return elapsedMs < CONTACT_MIN_SUBMIT_SECONDS * 1000;
+}
+
+function isHoneypotTriggered(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (CONTACT_HONEYPOT_FIELDS.length === 0) return false;
+
+  for (const fieldName of CONTACT_HONEYPOT_FIELDS) {
+    const matchingKey = Object.keys(data).find(key => key.toLowerCase() === fieldName);
+    if (!matchingKey) continue;
+
+    const value = data[matchingKey];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return true;
+    }
+
+    if (Array.isArray(value) && value.length > 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 function isSpam(message, email, name) {
   const messageStr = (message || '').toLowerCase();
