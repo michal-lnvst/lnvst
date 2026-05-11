@@ -1,0 +1,17 @@
+2-4-l
+Podsumowanie
+
+2-8-r
+Agencja Performance w trybie nieprzegadanym
+Znasz te wszystkie wykresy i logotypy jak ze stocka? Dla Semavo mieliśmy okazję przygotować rebranding do takiego właśnie stockowego logotypu. To oznacza rozpoczęcie od strategii, odkalamburyzowanie znaku oraz – rzecz jasna – stworzenie systemu. Systemu, który może rosnąć razem z firmą. Stary znak był poprawny, ale bardzo generyczny — wyglądał jak setki innych logotypów z kategorii „digital / growth / analytics”. Zamiast dokładać kolejne strzałki i wykresy, poszliśmy w stronę prostoty, technologicznego minimalizmu i mocnego, charakterystycznego detalu typograficznego. Nowy logotyp jest spokojny, ale ma w sobie twist, który sprawia, że marka zaczyna być rozpoznawalna, a nie tylko poprawna. No i mamy ten ukryty wzrost.
+
+2-8-r-a
+Na poziomie kolorystyki postawiliśmy na chłodną, cyfrową paletę opartą na błękitach, granatach i jasnych, lodowych odcieniach. Zamiast jednego koloru mamy skalę, dzięki której komunikacja może być albo bardzo techniczna, albo bardziej miękka i produktowa, bez wychodzenia poza system. 
+Najważniejsza zmiana wydarzyła się jednak w sposobie myślenia o marce. Zamiast pojedynczego logo powstał pełny design system: siatka, proporcje, gradienty, moduły, zasady pracy z typografią i layoutem. Dzięki temu nowe materiały nie wyglądają jak przypadkowe decyzje, tylko jak spójna platforma, która może działać w sprzedaży, marketingu i produkcie jednocześnie.
+Dużym elementem naszej pracy było opracowanie i wdrożenie nowej strony WWW – od koncepcji, przez projekt, aż po wdrożenie na Webflow. Tutaj też – jest prosto, przejrzyście, ale to prawdziwe narzędzie, a nie kolejna strona-szablon.
+Zamiast standardowego w tej branży layoutu zbudowaliśmy interfejs, który przypomina dashboard, panel danych albo aplikację. To było celowe, bo Semavo działa w świecie performance, analityki i e-commerce, więc komunikacja też musiała wyglądać jak coś, co jest oparte na liczbach, a nie na obietnicach. W końcu DNA tej marki jest SEO bez ściemy. Mówimy o widoczności, konwersjach i realnych wynikach.
+Layout jest modułowy, oparty na siatce i powtarzalnych blokach, dzięki czemu każda podstrona wygląda jak część jednego systemu, a nie jak osobny projekt.
+To jeden z tych rebrandingów, w których nic nie krzyczy, ale wszystko zaczyna wyglądać tak, jakby firma była dwa razy większa niż wczoraj. Bo jest :)
+
+14-8-r
+Więcej o markach technicznych możesz przeczytać tutaj: Intense

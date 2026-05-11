@@ -1,0 +1,39 @@
+/* Base wrapper */
+.blog_image_wrapper {
+  position: relative;
+  overflow: visible; /* Shows the outside half of centered stroke */
+
+  /* Defaults (overridable per element or combo class) */
+  --stroke-size: 3px;
+  --stroke-color: #22e5d2;
+  --stroke-radius: 28px;
+  --stroke-start: 0.78; /* 0..1, near top-right */
+  --stroke-end: 0.48; /* 0..1, near middle-bottom */
+}
+
+/* Thickness variants */
+.blog_image_wrapper.is-2px { --stroke-size: 2px; }
+.blog_image_wrapper.is-3px { --stroke-size: 3px; }
+.blog_image_wrapper.is-4px { --stroke-size: 4px; }
+.blog_image_wrapper.is-5px { --stroke-size: 5px; }
+
+/* Optional color variants */
+.blog_image_wrapper.is-teal { --stroke-color: #22e5d2; }
+.blog_image_wrapper.is-white { --stroke-color: #ffffff; }
+.blog_image_wrapper.is-black { --stroke-color: #111111; }
+
+/* Injected SVG overlay */
+.blog_image_wrapper .wf-partial-stroke {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.blog_image_wrapper .wf-partial-stroke path {
+  fill: none;
+  stroke: var(--stroke-color);
+  stroke-width: var(--stroke-size);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
