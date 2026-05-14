@@ -13,6 +13,7 @@ const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const IS_PRODUCTION = (process.env.NODE_ENV || '').toLowerCase() === 'production';
 const CONSENT_RETENTION_MONTHS = Number(process.env.CONSENT_RETENTION_MONTHS || 12);
 const CONSENT_HASH_SALT = process.env.CONSENT_HASH_SALT || '';
 const CONSENT_ACTIONS = new Set(['accept_all', 'reject_all', 'save_preferences', 'withdraw']);
@@ -69,13 +70,21 @@ async function initializeDatabase() {
   // Initialize SQL.js
   SQL = await initSqlJs();
 
+  const resolvedDbPath = path.resolve(dbPath);
+  const dbFileExists = fs.existsSync(dbPath);
+  console.log(`Database path: ${resolvedDbPath}`);
+
+  if (IS_PRODUCTION && !resolvedDbPath.replace(/\\/g, '/').startsWith('/data/')) {
+    console.warn('DATABASE_PATH is not under /data. On Koyeb, this is usually ephemeral storage.');
+  }
+
   // Create database directory if it doesn't exist
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
   // Load existing database or create new one
-  if (fs.existsSync(dbPath)) {
+  if (dbFileExists) {
     const data = fs.readFileSync(dbPath);
     db = new SQL.Database(data);
     console.log('Loaded existing database');
@@ -1173,6 +1182,7 @@ app.use((err, req, res, next) => {
 // ============================================
 
 let server;
+let cleanupIntervalRef;
 
 async function startServer() {
   try {
@@ -1180,7 +1190,7 @@ async function startServer() {
 
     // Do first cleanup after DB is ready
     cleanupExpiredLogs();
-    setInterval(cleanupExpiredLogs, 24 * 60 * 60 * 1000);
+    cleanupIntervalRef = setInterval(cleanupExpiredLogs, 24 * 60 * 60 * 1000);
 
     server = app.listen(PORT, () => {
       console.log(`🚀 Webhook server running on port ${PORT}`);
@@ -1209,8 +1219,13 @@ async function startServer() {
 startServer();
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\nShutting down gracefully...');
+function shutdownGracefully(signalName) {
+  console.log(`\nReceived ${signalName}. Shutting down gracefully...`);
+
+  if (cleanupIntervalRef) {
+    clearInterval(cleanupIntervalRef);
+  }
+
   saveDatabase();
 
   if (server && server.close) {
@@ -1221,4 +1236,7 @@ process.on('SIGINT', () => {
   } else {
     process.exit(0);
   }
-});
+}
+
+process.on('SIGINT', () => shutdownGracefully('SIGINT'));
+process.on('SIGTERM', () => shutdownGracefully('SIGTERM'));

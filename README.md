@@ -180,6 +180,22 @@ GETRESPONSE_LIST_ID_NEWSLETTER=...
 GETRESPONSE_LIST_ID_CONTACTS=...
 ```
 
+For persistent consent/contact logs on Koyeb, use a mounted volume and update:
+
+```env
+DATABASE_PATH=/data/app.db
+```
+
+### Koyeb Persistent Storage (required for GDPR log durability)
+
+1. In Koyeb service settings, add a persistent volume.
+2. Mount it at `/data`.
+3. Set environment variable: `DATABASE_PATH=/data/app.db`.
+4. Redeploy the service.
+5. Verify logs show `Loaded existing database` on restart (not `Created new database`).
+
+If you keep `DATABASE_PATH=./data/app.db` in production, logs may be lost on instance replacement.
+
 Optional SMTP variables can be added later.
 
 ## Behavior Summary
