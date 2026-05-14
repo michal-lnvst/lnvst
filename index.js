@@ -60,8 +60,8 @@ const multipartFormParser = multer().none();
 // DATABASE INITIALIZATION
 // ============================================
 
-const dbPath = process.env.DATABASE_PATH || './data/app.db';
-const dbDir = path.dirname(dbPath);
+let dbPath = process.env.DATABASE_PATH || './data/app.db';
+let dbDir = path.dirname(dbPath);
 let db = null;
 let SQL = null;
 
@@ -70,17 +70,29 @@ async function initializeDatabase() {
   // Initialize SQL.js
   SQL = await initSqlJs();
 
+  // Create database directory if it doesn't exist
+  if (!fs.existsSync(dbDir)) {
+    try {
+      fs.mkdirSync(dbDir, { recursive: true });
+    } catch (mkdirErr) {
+      const fallbackPath = path.join(__dirname, 'data', 'app.db');
+      const fallbackDir = path.dirname(fallbackPath);
+      console.warn(`Cannot create database directory at ${dbDir} (${mkdirErr.code}). Falling back to ${fallbackPath}`);
+      console.warn('Data will NOT persist across restarts. Add a Koyeb persistent volume mounted at /data to fix this.');
+      if (!fs.existsSync(fallbackDir)) {
+        fs.mkdirSync(fallbackDir, { recursive: true });
+      }
+      dbPath = fallbackPath;
+      dbDir = fallbackDir;
+    }
+  }
+
   const resolvedDbPath = path.resolve(dbPath);
   const dbFileExists = fs.existsSync(dbPath);
   console.log(`Database path: ${resolvedDbPath}`);
 
   if (IS_PRODUCTION && !resolvedDbPath.replace(/\\/g, '/').startsWith('/data/')) {
     console.warn('DATABASE_PATH is not under /data. On Koyeb, this is usually ephemeral storage.');
-  }
-
-  // Create database directory if it doesn't exist
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
   }
 
   // Load existing database or create new one
