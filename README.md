@@ -81,28 +81,19 @@ CONTACT_MIN_SUBMIT_SECONDS=3
 CONTACT_RATE_LIMIT_WINDOW_MS=60000
 CONTACT_RATE_LIMIT_MAX=5
 CONTACT_HONEYPOT_FIELDS=company_fax
+CONTACT_DEBUG_LOG_VALUES=false
+CONTACT_DEBUG_LOG_INCLUDE_RAW=false
 
 # Optional browser redirects for contact form submissions
 CONTACT_SUCCESS_REDIRECT_URL=https://example.com/contact-success
 CONTACT_ERROR_REDIRECT_URL=https://example.com/contact-error
-CONTACT_SUCCESS_REDIRECT_URL_PL=https://example.com/pl/kontakt/dziekujemy
-CONTACT_SUCCESS_REDIRECT_URL_EN=https://example.com/en/contact/thank-you
-CONTACT_ERROR_REDIRECT_URL_PL=https://example.com/pl/kontakt/blad
-CONTACT_ERROR_REDIRECT_URL_EN=https://example.com/en/contact/error
-
-# Optional browser redirects for newsletter submissions
-NEWSLETTER_SUCCESS_REDIRECT_URL=https://example.com/newsletter/success
-NEWSLETTER_ERROR_REDIRECT_URL=https://example.com/newsletter/error
-NEWSLETTER_SUCCESS_REDIRECT_URL_PL=https://example.com/pl/newsletter/sukces
-NEWSLETTER_SUCCESS_REDIRECT_URL_EN=https://example.com/en/newsletter/success
-NEWSLETTER_ERROR_REDIRECT_URL_PL=https://example.com/pl/newsletter/blad
-NEWSLETTER_ERROR_REDIRECT_URL_EN=https://example.com/en/newsletter/error
 ```
 
 Notes:
 
 - if SMTP is not configured correctly, contact submissions still save to the database
 - `.env` is ignored by Git and should never be committed
+- for GDPR-friendly diagnostics, keep `CONTACT_DEBUG_LOG_INCLUDE_RAW=false` (default)
 
 ## Local Development
 
@@ -243,28 +234,6 @@ Behavior:
 - browser form submissions are redirected with `303 See Other`
 - API requests still receive JSON
 - redirect URLs get query params like `success=1`, `message=...`, or `error=...`
-
-### Newsletter Thank-You Page (PL/EN)
-
-`POST /webhook/newsletter` now behaves like contact form responses for browser submits:
-
-- if redirect URL vars are set, user is redirected with `303 See Other`
-- if redirect URL vars are not set, backend renders a built-in thank-you/error HTML page
-- language is auto-detected from `lang`/`locale` (query/body), `Accept-Language`, and referrer path (`/pl/` or `/en/`)
-
-Recommended env vars for separate language pages:
-
-- `NEWSLETTER_SUCCESS_REDIRECT_URL_PL=https://yourdomain.com/pl/newsletter/dziekujemy`
-- `NEWSLETTER_SUCCESS_REDIRECT_URL_EN=https://yourdomain.com/en/newsletter/thank-you`
-- `NEWSLETTER_ERROR_REDIRECT_URL_PL=https://yourdomain.com/pl/newsletter/blad`
-- `NEWSLETTER_ERROR_REDIRECT_URL_EN=https://yourdomain.com/en/newsletter/error`
-
-Equivalent PL/EN vars are available for contact form redirects:
-
-- `CONTACT_SUCCESS_REDIRECT_URL_PL=...`
-- `CONTACT_SUCCESS_REDIRECT_URL_EN=...`
-- `CONTACT_ERROR_REDIRECT_URL_PL=...`
-- `CONTACT_ERROR_REDIRECT_URL_EN=...`
 
 `POST /api/consent/log`
 
