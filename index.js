@@ -25,16 +25,6 @@ const CONTACT_HONEYPOT_FIELDS = (process.env.CONTACT_HONEYPOT_FIELDS || 'company
   .filter(Boolean);
 const CONTACT_SUCCESS_REDIRECT_URL = process.env.CONTACT_SUCCESS_REDIRECT_URL || '';
 const CONTACT_ERROR_REDIRECT_URL = process.env.CONTACT_ERROR_REDIRECT_URL || '';
-const CONTACT_SUCCESS_REDIRECT_URL_PL = process.env.CONTACT_SUCCESS_REDIRECT_URL_PL || '';
-const CONTACT_SUCCESS_REDIRECT_URL_EN = process.env.CONTACT_SUCCESS_REDIRECT_URL_EN || '';
-const CONTACT_ERROR_REDIRECT_URL_PL = process.env.CONTACT_ERROR_REDIRECT_URL_PL || '';
-const CONTACT_ERROR_REDIRECT_URL_EN = process.env.CONTACT_ERROR_REDIRECT_URL_EN || '';
-const NEWSLETTER_SUCCESS_REDIRECT_URL = process.env.NEWSLETTER_SUCCESS_REDIRECT_URL || '';
-const NEWSLETTER_ERROR_REDIRECT_URL = process.env.NEWSLETTER_ERROR_REDIRECT_URL || '';
-const NEWSLETTER_SUCCESS_REDIRECT_URL_PL = process.env.NEWSLETTER_SUCCESS_REDIRECT_URL_PL || '';
-const NEWSLETTER_SUCCESS_REDIRECT_URL_EN = process.env.NEWSLETTER_SUCCESS_REDIRECT_URL_EN || '';
-const NEWSLETTER_ERROR_REDIRECT_URL_PL = process.env.NEWSLETTER_ERROR_REDIRECT_URL_PL || '';
-const NEWSLETTER_ERROR_REDIRECT_URL_EN = process.env.NEWSLETTER_ERROR_REDIRECT_URL_EN || '';
 
 const contactRateLimitStore = new Map();
 
@@ -72,10 +62,8 @@ let SQL = null;
 
 // Initialize database
 async function initializeDatabase() {
-  // Initialize SQL.js — explicitly locate the WASM file so it works in production containers
-  SQL = await initSqlJs({
-    locateFile: file => path.join(__dirname, 'node_modules', 'sql.js', 'dist', file)
-  });
+  // Initialize SQL.js
+  SQL = await initSqlJs();
 
   // Create database directory if it doesn't exist
   if (!fs.existsSync(dbDir)) {
@@ -180,21 +168,18 @@ async function webhookNewsletterHandler(req, res) {
     
     if (!email) {
       console.warn('No email found in submission');
-      return respondForNewsletterRequest(req, res, 400, { error: 'Email not found in submission' });
+      return res.status(400).json({ error: 'Email not found in submission' });
     }
 
     // Send to GetResponse newsletter list
     await addContactToGetResponse(email, req.body, 'newsletter');
 
     console.log(`Successfully added ${email} to GetResponse newsletter list`);
-    return respondForNewsletterRequest(req, res, 200, {
-      success: true,
-      message: 'Contact added to GetResponse newsletter'
-    });
+    res.status(200).json({ success: true, message: 'Contact added to GetResponse newsletter' });
 
   } catch (error) {
     console.error('Newsletter webhook error:', error.message);
-    return respondForNewsletterRequest(req, res, 500, { error: error.message });
+    res.status(500).json({ error: error.message });
   }
 }
 
@@ -446,37 +431,6 @@ function requestPrefersHtml(req) {
   return acceptHeader.includes('text/html');
 }
 
-function normalizeLocale(value) {
-  const raw = (value || '').toString().trim().toLowerCase();
-  if (!raw) return '';
-
-  if (raw.startsWith('en')) return 'en';
-  if (raw.startsWith('pl')) return 'pl';
-  return '';
-}
-
-function detectRequestLocale(req, payload = {}) {
-  const queryLocale = normalizeLocale(req.query?.lang || req.query?.locale);
-  if (queryLocale) return queryLocale;
-
-  const bodyLocale = normalizeLocale(req.body?.lang || req.body?.locale);
-  if (bodyLocale) return bodyLocale;
-
-  const payloadLocale = normalizeLocale(payload.locale);
-  if (payloadLocale) return payloadLocale;
-
-  const acceptLanguage = (req.headers['accept-language'] || '').toString();
-  const firstLang = acceptLanguage.split(',')[0] || '';
-  const headerLocale = normalizeLocale(firstLang);
-  if (headerLocale) return headerLocale;
-
-  const referer = (req.headers.referer || '').toString().toLowerCase();
-  if (referer.includes('/en/') || /[?&]lang=en(?:-|_|&|$)/.test(referer)) return 'en';
-  if (referer.includes('/pl/') || /[?&]lang=pl(?:-|_|&|$)/.test(referer)) return 'pl';
-
-  return 'pl';
-}
-
 function buildRedirectUrl(baseUrl, payload = {}) {
   if (!baseUrl) return null;
 
@@ -506,209 +460,19 @@ function buildRedirectUrl(baseUrl, payload = {}) {
   }
 }
 
-function getLocalizedRedirectBaseUrl(formType, statusCode, locale) {
-  const isError = statusCode >= 400;
-
-  if (formType === 'newsletter') {
-    if (isError) {
-      if (locale === 'en' && NEWSLETTER_ERROR_REDIRECT_URL_EN) return NEWSLETTER_ERROR_REDIRECT_URL_EN;
-      if (locale === 'pl' && NEWSLETTER_ERROR_REDIRECT_URL_PL) return NEWSLETTER_ERROR_REDIRECT_URL_PL;
-      return NEWSLETTER_ERROR_REDIRECT_URL || NEWSLETTER_SUCCESS_REDIRECT_URL;
-    }
-
-    if (locale === 'en' && NEWSLETTER_SUCCESS_REDIRECT_URL_EN) return NEWSLETTER_SUCCESS_REDIRECT_URL_EN;
-    if (locale === 'pl' && NEWSLETTER_SUCCESS_REDIRECT_URL_PL) return NEWSLETTER_SUCCESS_REDIRECT_URL_PL;
-    return NEWSLETTER_SUCCESS_REDIRECT_URL;
-  }
-
-  if (isError) {
-    if (locale === 'en' && CONTACT_ERROR_REDIRECT_URL_EN) return CONTACT_ERROR_REDIRECT_URL_EN;
-    if (locale === 'pl' && CONTACT_ERROR_REDIRECT_URL_PL) return CONTACT_ERROR_REDIRECT_URL_PL;
-    return CONTACT_ERROR_REDIRECT_URL || CONTACT_SUCCESS_REDIRECT_URL;
-  }
-
-  if (locale === 'en' && CONTACT_SUCCESS_REDIRECT_URL_EN) return CONTACT_SUCCESS_REDIRECT_URL_EN;
-  if (locale === 'pl' && CONTACT_SUCCESS_REDIRECT_URL_PL) return CONTACT_SUCCESS_REDIRECT_URL_PL;
-  return CONTACT_SUCCESS_REDIRECT_URL;
-}
-
-function getLocalizedUiText(formType, statusCode, payload, locale) {
-  const success = statusCode < 400;
-
-  if (success) {
-    if (formType === 'newsletter') {
-      if (locale === 'en') {
-        return {
-          title: 'Thanks for subscribing',
-          message: 'You have been added to our newsletter.',
-          buttonLabel: 'Back to website'
-        };
-      }
-
-      return {
-        title: 'Dziekujemy za zapis',
-        message: 'Dodano Cie do newslettera.',
-        buttonLabel: 'Wroc na strone'
-      };
-    }
-
-    if (locale === 'en') {
-      return {
-        title: 'Thanks for your message',
-        message: 'Your form was sent successfully.',
-        buttonLabel: 'Back to website'
-      };
-    }
-
-    return {
-      title: 'Dziekujemy za wiadomosc',
-      message: 'Formularz zostal wyslany poprawnie.',
-      buttonLabel: 'Wroc na strone'
-    };
-  }
-
-  if (locale === 'en') {
-    return {
-      title: 'Something went wrong',
-      message: payload.error || 'Please try again in a moment.',
-      buttonLabel: 'Back to website'
-    };
-  }
-
-  return {
-    title: 'Wystapil problem',
-    message: payload.error || 'Sprobuj ponownie za chwile.',
-    buttonLabel: 'Wroc na strone'
-  };
-}
-
-function buildWebhookResponsePage({ formType, statusCode, payload, locale, backUrl }) {
-  const success = statusCode < 400;
-  const text = getLocalizedUiText(formType, statusCode, payload, locale);
-  const safeTitle = escapeHtml(text.title);
-  const safeMessage = escapeHtml(text.message);
-  const safeButtonLabel = escapeHtml(text.buttonLabel);
-  const safeBackUrl = backUrl ? escapeHtml(backUrl) : '/';
-
-  return `<!doctype html>
-<html lang="${locale}">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${safeTitle}</title>
-  <style>
-    :root {
-      --bg: #f5f6fb;
-      --card-bg: #ffffff;
-      --text: #1f2444;
-      --muted: #59618c;
-      --accent: #4248ae;
-      --accent-soft: #e8e9fb;
-      --error: #b42318;
-      --error-soft: #fef3f2;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-      background: radial-gradient(circle at 10% 0%, #eef0ff 0%, var(--bg) 55%, #f9faff 100%);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: var(--text);
-    }
-    .card {
-      width: 100%;
-      max-width: 560px;
-      background: var(--card-bg);
-      border-radius: 18px;
-      padding: 28px;
-      box-shadow: 0 18px 45px rgba(40, 47, 96, 0.12);
-      border: 1px solid #e5e8fb;
-    }
-    .status {
-      display: inline-flex;
-      align-items: center;
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 14px;
-      background: ${success ? 'var(--accent-soft)' : 'var(--error-soft)'};
-      color: ${success ? 'var(--accent)' : 'var(--error)'};
-    }
-    h1 {
-      margin: 0;
-      font-size: 30px;
-      line-height: 1.2;
-      letter-spacing: -0.02em;
-    }
-    p {
-      margin: 12px 0 0;
-      color: var(--muted);
-      font-size: 16px;
-      line-height: 1.55;
-    }
-    .actions {
-      margin-top: 22px;
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 11px 16px;
-      border-radius: 10px;
-      border: none;
-      background: var(--accent);
-      color: #fff;
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 14px;
-    }
-    .btn:hover { filter: brightness(1.05); }
-  </style>
-</head>
-<body>
-  <main class="card">
-    <div class="status">${success ? 'OK' : 'ERROR'}</div>
-    <h1>${safeTitle}</h1>
-    <p>${safeMessage}</p>
-    <div class="actions">
-      <a class="btn" href="${safeBackUrl}">${safeButtonLabel}</a>
-    </div>
-  </main>
-</body>
-</html>`;
-}
-
-function respondForFormRequest(req, res, statusCode, payload, formType) {
+function respondForContactRequest(req, res, statusCode, payload) {
   if (requestPrefersHtml(req)) {
-    const locale = detectRequestLocale(req, payload);
-    const redirectBaseUrl = getLocalizedRedirectBaseUrl(formType, statusCode, locale);
+    const redirectBaseUrl = statusCode >= 400
+      ? (CONTACT_ERROR_REDIRECT_URL || CONTACT_SUCCESS_REDIRECT_URL)
+      : CONTACT_SUCCESS_REDIRECT_URL;
     const redirectUrl = buildRedirectUrl(redirectBaseUrl, payload);
 
     if (redirectUrl) {
-      return res.redirect(303, redirectUrl);
+      return res.redirect(statusCode >= 400 ? 303 : 303, redirectUrl);
     }
-
-    const backUrl = (req.headers.referer || '').toString() || '/';
-    const html = buildWebhookResponsePage({ formType, statusCode, payload, locale, backUrl });
-    return res.status(statusCode).type('html').send(html);
   }
 
   return res.status(statusCode).json(payload);
-}
-
-function respondForContactRequest(req, res, statusCode, payload) {
-  return respondForFormRequest(req, res, statusCode, payload, 'contact');
-}
-
-function respondForNewsletterRequest(req, res, statusCode, payload) {
-  return respondForFormRequest(req, res, statusCode, payload, 'newsletter');
 }
 
 // ============================================
@@ -1300,6 +1064,14 @@ function extractPhoneFromWebflowData(data) {
 // ============================================
 // HEALTH CHECK ENDPOINT
 // ============================================
+
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    service: 'webflow-getresponse-webhook',
+    timestamp: new Date().toISOString()
+  });
+});
 
 app.get('/health', (req, res) => {
   res.status(200).json({ 
