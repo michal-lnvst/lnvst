@@ -1,5 +1,7 @@
 require('dotenv').config();
 
+console.log('Node.js process started, env PORT:', process.env.PORT);
+
 const express = require('express');
 const axios = require('axios');
 const initSqlJs = require('sql.js');
