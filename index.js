@@ -57,10 +57,16 @@ app.use(express.urlencoded({ extended: true }));
 // DATABASE INITIALIZATION
 // ============================================
 
-const dbPath = process.env.DATABASE_PATH || './data/app.db';
-const dbDir = path.dirname(dbPath);
+let dbPath = process.env.DATABASE_PATH || './data/app.db';
+let dbDir = path.dirname(dbPath);
 let db = null;
 let SQL = null;
+
+function switchToFallbackDatabasePath(reason) {
+  const fallbackPath = '/tmp/app.db';
+  console.warn(`Database path fallback: ${reason}. Using ${fallbackPath} instead.`);
+  return fallbackPath;
+}
 
 // Initialize database
 async function initializeDatabase() {
@@ -72,6 +78,19 @@ async function initializeDatabase() {
   });
 
   // Create database directory if it doesn't exist
+  if (!fs.existsSync(dbDir)) {
+    try {
+      fs.mkdirSync(dbDir, { recursive: true });
+    } catch (error) {
+      if (error.code === 'EACCES' || error.code === 'EPERM') {
+        dbPath = switchToFallbackDatabasePath(`cannot create ${dbDir} (${error.code})`);
+        dbDir = path.dirname(dbPath);
+      } else {
+        throw error;
+      }
+    }
+  }
+
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
   }
