@@ -64,8 +64,12 @@ let SQL = null;
 
 // Initialize database
 async function initializeDatabase() {
-  // Initialize SQL.js
-  SQL = await initSqlJs();
+  console.log('Initializing database...');
+
+  // Initialize SQL.js with an explicit WASM path for container environments.
+  SQL = await initSqlJs({
+    locateFile: (file) => path.join(__dirname, 'node_modules', 'sql.js', 'dist', file)
+  });
 
   // Create database directory if it doesn't exist
   if (!fs.existsSync(dbDir)) {
@@ -127,6 +131,8 @@ async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_consent_preferences_consent_id ON consent_preferences(consent_id);
     CREATE INDEX IF NOT EXISTS idx_consent_preferences_expires ON consent_preferences(expires_at);
   `);
+
+  console.log('Database initialized successfully');
 
   saveDatabase();
 }
@@ -1103,12 +1109,6 @@ let server;
 
 async function startServer() {
   try {
-    await initializeDatabase();
-
-    // Do first cleanup after DB is ready
-    cleanupExpiredLogs();
-    setInterval(cleanupExpiredLogs, 24 * 60 * 60 * 1000);
-
     server = app.listen(PORT, () => {
       console.log(`🚀 Webhook server running on port ${PORT}`);
       console.log(`📝 Webflow webhook endpoint: http://localhost:${PORT}/webhook/webflow`);
@@ -1125,6 +1125,18 @@ async function startServer() {
       }
       process.exit(1);
     });
+
+    // Initialize the database after the port is already open so platform health checks can pass.
+    initializeDatabase()
+      .then(() => {
+        // Do first cleanup after DB is ready
+        cleanupExpiredLogs();
+        setInterval(cleanupExpiredLogs, 24 * 60 * 60 * 1000);
+      })
+      .catch((error) => {
+        console.error('Failed to initialize database:', error);
+        process.exit(1);
+      });
 
   } catch (error) {
     console.error('Failed to start server:', error);
