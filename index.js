@@ -186,28 +186,50 @@ const transporter = nodemailer.createTransport({
 // NEWSLETTER WEBHOOK HANDLER (legacy /webflow alias included)
 // ============================================
 
+
 async function webhookNewsletterHandler(req, res) {
   try {
     console.log('Newsletter form submission received:', req.body);
 
     // Extract email from form data
     const email = extractEmailFromWebflowData(req.body);
-    
     if (!email) {
       console.warn('No email found in submission');
-      return res.status(400).json({ error: 'Email not found in submission' });
+      return respondForNewsletterRequest(req, res, 400, { error: 'Email not found in submission' });
     }
 
     // Send to GetResponse newsletter list
     await addContactToGetResponse(email, req.body, 'newsletter');
 
     console.log(`Successfully added ${email} to GetResponse newsletter list`);
-    res.status(200).json({ success: true, message: 'Contact added to GetResponse newsletter' });
+    return respondForNewsletterRequest(req, res, 200, { success: true, message: 'Contact added to GetResponse newsletter' });
 
   } catch (error) {
     console.error('Newsletter webhook error:', error.message);
-    res.status(500).json({ error: error.message });
+    return respondForNewsletterRequest(req, res, 500, { error: error.message });
   }
+}
+// Newsletter redirect/response logic
+const NEWSLETTER_SUCCESS_REDIRECT_URL_PL = process.env.NEWSLETTER_SUCCESS_REDIRECT_URL_PL || '';
+const NEWSLETTER_SUCCESS_REDIRECT_URL_EN = process.env.NEWSLETTER_SUCCESS_REDIRECT_URL_EN || '';
+const NEWSLETTER_ERROR_REDIRECT_URL_PL = process.env.NEWSLETTER_ERROR_REDIRECT_URL_PL || '';
+const NEWSLETTER_ERROR_REDIRECT_URL_EN = process.env.NEWSLETTER_ERROR_REDIRECT_URL_EN || '';
+
+function getNewsletterLocale(req) {
+  const referer = (req.headers.referer || req.headers.referrer || '').toString();
+  return referer.includes('/en') ? 'en' : 'pl';
+}
+
+function respondForNewsletterRequest(req, res, statusCode, payload) {
+  const locale = getNewsletterLocale(req);
+  const successUrl = locale === 'pl' ? NEWSLETTER_SUCCESS_REDIRECT_URL_PL : NEWSLETTER_SUCCESS_REDIRECT_URL_EN;
+  const errorUrl = locale === 'pl' ? NEWSLETTER_ERROR_REDIRECT_URL_PL : NEWSLETTER_ERROR_REDIRECT_URL_EN;
+  const redirectBaseUrl = statusCode >= 400 ? (errorUrl || successUrl) : successUrl;
+  const redirectUrl = buildRedirectUrl(redirectBaseUrl, payload);
+  if (redirectUrl) {
+    return res.redirect(303, redirectUrl);
+  }
+  return res.status(statusCode).json(payload);
 }
 
 app.post('/webhook/newsletter', webhookNewsletterHandler);
