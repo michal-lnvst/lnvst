@@ -9,15 +9,10 @@ const nodemailer = require('nodemailer');
 const validator = require('validator');
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
 const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const CONSENT_RETENTION_MONTHS = Number(process.env.CONSENT_RETENTION_MONTHS || 12);
-const CONSENT_HASH_SALT = process.env.CONSENT_HASH_SALT || '';
-const CONSENT_ACTIONS = new Set(['accept_all', 'reject_all', 'save_preferences', 'withdraw']);
-const CONSENT_CATEGORIES = ['necessary', 'analytics', 'marketing', 'personalization'];
 const CONTACT_MIN_SUBMIT_SECONDS = Number(process.env.CONTACT_MIN_SUBMIT_SECONDS || 3);
 const CONTACT_RATE_LIMIT_WINDOW_MS = Number(process.env.CONTACT_RATE_LIMIT_WINDOW_MS || 60000);
 const CONTACT_RATE_LIMIT_MAX = Number(process.env.CONTACT_RATE_LIMIT_MAX || 5);
@@ -116,39 +111,7 @@ async function initializeDatabase() {
       ip_address TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS consent_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_identifier TEXT NOT NULL,
-      consent_type TEXT NOT NULL,
-      consent_given BOOLEAN NOT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      expires_at DATETIME
-    );
-
-    CREATE TABLE IF NOT EXISTS consent_preferences (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      consent_id TEXT NOT NULL,
-      action TEXT NOT NULL,
-      necessary INTEGER NOT NULL DEFAULT 1,
-      analytics INTEGER NOT NULL DEFAULT 0,
-      marketing INTEGER NOT NULL DEFAULT 0,
-      personalization INTEGER NOT NULL DEFAULT 0,
-      consent_source TEXT,
-      policy_version TEXT,
-      banner_version TEXT,
-      locale TEXT,
-      region TEXT,
-      user_identifier_hash TEXT,
-      ip_address TEXT,
-      user_agent TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      expires_at DATETIME NOT NULL
-    );
-
     CREATE INDEX IF NOT EXISTS idx_contact_email ON contact_submissions(email);
-    CREATE INDEX IF NOT EXISTS idx_consent_expires ON consent_logs(expires_at);
-    CREATE INDEX IF NOT EXISTS idx_consent_preferences_consent_id ON consent_preferences(consent_id);
-    CREATE INDEX IF NOT EXISTS idx_consent_preferences_expires ON consent_preferences(expires_at);
   `);
 
   console.log('Database initialized successfully');
@@ -570,322 +533,6 @@ function escapeHtml(text) {
 }
 
 // ============================================
-// COOKIE CONSENT LOGGING
-// ============================================
-
-function hashIdentifier(value) {
-  const normalized = (value || '').toString().trim().toLowerCase();
-  if (!normalized) return null;
-
-  return crypto
-    .createHash('sha256')
-    .update(`${CONSENT_HASH_SALT}:${normalized}`)
-    .digest('hex');
-}
-
-function getClientIp(req) {
-  const forwardedFor = req.headers['x-forwarded-for'];
-  if (typeof forwardedFor === 'string' && forwardedFor.length > 0) {
-    return forwardedFor.split(',')[0].trim();
-  }
-
-  return req.ip || '';
-}
-
-function getRetentionExpiryDate() {
-  const expiresAt = new Date();
-  expiresAt.setMonth(expiresAt.getMonth() + CONSENT_RETENTION_MONTHS);
-  return expiresAt;
-}
-
-function normalizeConsentPreferences(rawPreferences = {}, action = 'save_preferences') {
-  const base = {
-    necessary: true,
-    analytics: Boolean(rawPreferences.analytics),
-    marketing: Boolean(rawPreferences.marketing),
-    personalization: Boolean(rawPreferences.personalization)
-  };
-
-  if (action === 'accept_all') {
-    return {
-      necessary: true,
-      analytics: true,
-      marketing: true,
-      personalization: true
-    };
-  }
-
-  if (action === 'reject_all' || action === 'withdraw') {
-    return {
-      necessary: true,
-      analytics: false,
-      marketing: false,
-      personalization: false
-    };
-  }
-
-  return base;
-}
-
-function parseConsentPayload(body = {}) {
-  const requestedAction = (body.action || 'save_preferences').toString().trim().toLowerCase();
-  const action = CONSENT_ACTIONS.has(requestedAction) ? requestedAction : null;
-
-  if (!action) {
-    throw new Error('Invalid action. Allowed: accept_all, reject_all, save_preferences, withdraw');
-  }
-
-  const consentIdRaw = (body.consentId || '').toString().trim();
-  const consentId = consentIdRaw || crypto.randomUUID();
-
-  if (consentId.length > 120) {
-    throw new Error('consentId is too long');
-  }
-
-  const preferences = normalizeConsentPreferences(body.preferences || {}, action);
-
-  return {
-    consentId,
-    action,
-    preferences,
-    consentSource: (body.consentSource || 'webflow').toString().slice(0, 80),
-    policyVersion: (body.policyVersion || '').toString().slice(0, 40),
-    bannerVersion: (body.bannerVersion || '').toString().slice(0, 40),
-    locale: (body.locale || '').toString().slice(0, 20),
-    region: (body.region || '').toString().slice(0, 20),
-    userIdentifierHash: hashIdentifier(body.userIdentifier)
-  };
-}
-
-function mapFirstRow(result) {
-  if (!result || result.length === 0 || result[0].values.length === 0) {
-    return null;
-  }
-
-  const row = {};
-  const [firstRow] = result[0].values;
-
-  result[0].columns.forEach((column, index) => {
-    row[column] = firstRow[index];
-  });
-
-  return row;
-}
-
-function persistConsentPreference(req, payload) {
-  const expiresAt = getRetentionExpiryDate();
-  const ipAddress = getClientIp(req);
-  const userAgent = (req.headers['user-agent'] || '').toString().slice(0, 500);
-
-  db.run(
-    `INSERT INTO consent_preferences (
-      consent_id, action, necessary, analytics, marketing, personalization,
-      consent_source, policy_version, banner_version, locale, region,
-      user_identifier_hash, ip_address, user_agent, expires_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      payload.consentId,
-      payload.action,
-      payload.preferences.necessary ? 1 : 0,
-      payload.preferences.analytics ? 1 : 0,
-      payload.preferences.marketing ? 1 : 0,
-      payload.preferences.personalization ? 1 : 0,
-      payload.consentSource,
-      payload.policyVersion,
-      payload.bannerVersion,
-      payload.locale,
-      payload.region,
-      payload.userIdentifierHash,
-      ipAddress,
-      userAgent,
-      expiresAt.toISOString()
-    ]
-  );
-
-  saveDatabase();
-
-  return {
-    consentId: payload.consentId,
-    action: payload.action,
-    preferences: payload.preferences,
-    expiresAt: expiresAt.toISOString()
-  };
-}
-
-app.post('/api/consent/preferences', (req, res) => {
-  try {
-    const payload = parseConsentPayload(req.body);
-    const stored = persistConsentPreference(req, payload);
-
-    console.log(`Consent preference stored: ${stored.consentId} - ${stored.action}`);
-
-    res.status(200).json({
-      success: true,
-      ...stored,
-      categories: CONSENT_CATEGORIES
-    });
-  } catch (error) {
-    console.error('Consent preferences error:', error.message);
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.post('/api/consent/withdraw', (req, res) => {
-  try {
-    const payload = parseConsentPayload({
-      ...req.body,
-      action: 'withdraw',
-      preferences: {
-        analytics: false,
-        marketing: false,
-        personalization: false
-      }
-    });
-
-    const stored = persistConsentPreference(req, payload);
-    console.log(`Consent withdrawn: ${stored.consentId}`);
-
-    res.status(200).json({
-      success: true,
-      ...stored,
-      categories: CONSENT_CATEGORIES
-    });
-  } catch (error) {
-    console.error('Consent withdrawal error:', error.message);
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.get('/api/consent/preferences/:consentId', (req, res) => {
-  try {
-    const consentId = (req.params.consentId || '').toString().trim();
-    if (!consentId) {
-      return res.status(400).json({ error: 'consentId is required' });
-    }
-
-    const result = db.exec(
-      `SELECT consent_id, action, necessary, analytics, marketing, personalization,
-              consent_source, policy_version, banner_version, locale, region,
-              created_at, expires_at
-       FROM consent_preferences
-       WHERE consent_id = ? AND expires_at >= ?
-       ORDER BY created_at DESC
-       LIMIT 1`,
-      [consentId, new Date().toISOString()]
-    );
-
-    const row = mapFirstRow(result);
-    if (!row) {
-      return res.status(404).json({ error: 'Consent record not found' });
-    }
-
-    return res.status(200).json({
-      success: true,
-      consentId: row.consent_id,
-      action: row.action,
-      preferences: {
-        necessary: Boolean(row.necessary),
-        analytics: Boolean(row.analytics),
-        marketing: Boolean(row.marketing),
-        personalization: Boolean(row.personalization)
-      },
-      consentSource: row.consent_source,
-      policyVersion: row.policy_version,
-      bannerVersion: row.banner_version,
-      locale: row.locale,
-      region: row.region,
-      createdAt: row.created_at,
-      expiresAt: row.expires_at
-    });
-  } catch (error) {
-    console.error('Consent lookup error:', error.message);
-    return res.status(500).json({ error: 'Failed to fetch consent record' });
-  }
-});
-
-app.post('/api/consent/log', async (req, res) => {
-  try {
-    const { userIdentifier, consentType, consentGiven, consentId } = req.body;
-
-    // Validate input
-    if (!userIdentifier || !consentType || consentGiven === undefined) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Log consent with retention expiration (legacy table)
-    const expiresAt = getRetentionExpiryDate();
-
-    db.run(
-      `INSERT INTO consent_logs (user_identifier, consent_type, consent_given, expires_at)
-       VALUES (?, ?, ?, ?)`,
-      [userIdentifier, consentType, consentGiven ? 1 : 0, expiresAt.toISOString()]
-    );
-
-    // Mirror legacy log into consent_preferences to maintain a single source of truth
-    const normalizedType = consentType.toString().trim().toLowerCase();
-    const basePreferences = {
-      necessary: true,
-      analytics: false,
-      marketing: false,
-      personalization: false
-    };
-
-    if (normalizedType === 'all') {
-      basePreferences.analytics = Boolean(consentGiven);
-      basePreferences.marketing = Boolean(consentGiven);
-      basePreferences.personalization = Boolean(consentGiven);
-    } else if (Object.prototype.hasOwnProperty.call(basePreferences, normalizedType)) {
-      basePreferences[normalizedType] = Boolean(consentGiven);
-    }
-
-    const mirroredPayload = parseConsentPayload({
-      action: consentGiven ? 'save_preferences' : 'reject_all',
-      consentId,
-      preferences: basePreferences,
-      consentSource: 'legacy_api',
-      userIdentifier
-    });
-
-    persistConsentPreference(req, mirroredPayload);
-
-    saveDatabase();
-
-    console.log(`Consent logged: ${userIdentifier} - ${consentType} - ${consentGiven}`);
-
-    res.status(200).json({ success: true, message: 'Consent logged' });
-
-  } catch (error) {
-    console.error('Consent logging error:', error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================
-// AUTO-CLEANUP EXPIRED CONSENT LOGS
-// ============================================
-
-function cleanupExpiredLogs() {
-  if (!db) {
-    console.debug('cleanupExpiredLogs: db not initialized yet');
-    return;
-  }
-
-  try {
-    const now = new Date().toISOString();
-    db.run(`
-      DELETE FROM consent_logs WHERE expires_at < ?
-    `, [now]);
-    db.run(`
-      DELETE FROM consent_preferences WHERE expires_at < ?
-    `, [now]);
-    saveDatabase();
-    console.log('Cleaned up expired consent logs');
-  } catch (error) {
-    console.error('Cleanup error:', error.message);
-  }
-}
-
-// ============================================
 // EXTRACT EMAIL FROM WEBFLOW DATA
 // ============================================
 
@@ -1154,7 +801,6 @@ async function startServer() {
       console.log(`🚀 Webhook server running on port ${PORT}`);
       console.log(`📝 Webflow webhook endpoint: http://localhost:${PORT}/webhook/webflow`);
       console.log(`📧 Contact webhook endpoint: http://localhost:${PORT}/webhook/contact`);
-      console.log(`🔒 Consent logging endpoint: http://localhost:${PORT}/api/consent/log`);
       console.log(`🏥 Health check: http://localhost:${PORT}/health`);
     });
 
@@ -1169,11 +815,6 @@ async function startServer() {
 
     // Initialize the database after the port is already open so platform health checks can pass.
     initializeDatabase()
-      .then(() => {
-        // Do first cleanup after DB is ready
-        cleanupExpiredLogs();
-        setInterval(cleanupExpiredLogs, 24 * 60 * 60 * 1000);
-      })
       .catch((error) => {
         console.error('Failed to initialize database:', error);
         process.exit(1);
