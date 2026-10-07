@@ -733,6 +733,10 @@ async function addContactToGetResponse(email, webflowData, listType = 'newslette
       contactData.customFieldValues = customFieldValues;
     }
 
+    if (listType === 'rebranding') {
+      console.log('Rebranding budget:', JSON.stringify(budget), 'budgetFieldId set:', Boolean(budgetFieldId), 'customFieldValues:', JSON.stringify(customFieldValues));
+    }
+
     // Make request to GetResponse API
     const response = await axios.post(
       'https://api.getresponse.com/v3/contacts',
