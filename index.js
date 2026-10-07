@@ -22,6 +22,9 @@ const CONTACT_HONEYPOT_FIELDS = (process.env.CONTACT_HONEYPOT_FIELDS || 'company
   .filter(Boolean);
 const CONTACT_SUCCESS_REDIRECT_URL = process.env.CONTACT_SUCCESS_REDIRECT_URL || '';
 const CONTACT_ERROR_REDIRECT_URL = process.env.CONTACT_ERROR_REDIRECT_URL || '';
+const REBRANDING_SUCCESS_REDIRECT_URL = process.env.REBRANDING_SUCCESS_REDIRECT_URL || CONTACT_SUCCESS_REDIRECT_URL;
+const REBRANDING_ERROR_REDIRECT_URL = process.env.REBRANDING_ERROR_REDIRECT_URL || CONTACT_ERROR_REDIRECT_URL;
+const REBRANDING_NOTIFY_EMAIL = process.env.REBRANDING_NOTIFY_EMAIL || 'lena@lenivastudio.com';
 
 const contactRateLimitStore = new Map();
 
@@ -107,6 +110,16 @@ async function initializeDatabase() {
       email TEXT NOT NULL,
       name TEXT,
       message TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      ip_address TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS rebranding_submissions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      name TEXT,
+      message TEXT,
+      budget TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       ip_address TEXT
     );
@@ -275,10 +288,93 @@ app.post('/webhook/contact', async (req, res) => {
 });
 
 // ============================================
+// REBRANDING FORM WEBHOOK
+// ============================================
+
+app.post('/webhook/rebranding', async (req, res) => {
+  const urls = { success: REBRANDING_SUCCESS_REDIRECT_URL, error: REBRANDING_ERROR_REDIRECT_URL };
+
+  try {
+    console.log('Rebranding form submission received');
+
+    const ipAddress = getClientIp(req);
+
+    const rateLimit = getContactRateLimitStatus(ipAddress, 'rebranding');
+    if (rateLimit.limited) {
+      return respondForContactRequest(req, res, 429, {
+        error: 'Too many submissions. Please try again later.',
+        retryAfterSeconds: rateLimit.retryAfterSeconds
+      }, urls);
+    }
+
+    if (isHoneypotTriggered(req.body) || isSubmittedTooQuickly(req.body)) {
+      console.warn(`Rebranding submission silently dropped (honeypot/fast submit) from ${ipAddress}`);
+      return respondForContactRequest(req, res, 200, { success: true, message: 'Submission received' }, urls);
+    }
+
+    const email = extractEmailFromWebflowData(req.body);
+    const name = extractNameFromWebflowData(req.body) || 'Anonymous';
+    const message = extractMessageFromWebflowData(req.body);
+    const budget = extractBudgetFromWebflowData(req.body);
+
+    if (!email || !validator.isEmail(email)) {
+      return respondForContactRequest(req, res, 400, { error: 'Valid email required' }, urls);
+    }
+
+    if (!budget) {
+      return respondForContactRequest(req, res, 400, { error: 'Budget selection required' }, urls);
+    }
+
+    if (isSpam(message, email, name)) {
+      console.warn(`Spam detected from ${email}`);
+      return respondForContactRequest(req, res, 200, { success: true, message: 'Submission received' }, urls);
+    }
+
+    db.run(
+      `INSERT INTO rebranding_submissions (email, name, message, budget, ip_address)
+       VALUES (?, ?, ?, ?, ?)`,
+      [email, name, message, budget, ipAddress]
+    );
+    saveDatabase();
+
+    try {
+      await sendContactEmailNotification(email, name, message, {
+        to: REBRANDING_NOTIFY_EMAIL,
+        formLabel: 'Rebranding',
+        budget
+      });
+    } catch (err) {
+      console.warn('Email notification skipped:', err.message);
+    }
+
+    try {
+      await addContactToGetResponse(email, { ...req.body, name, message }, 'rebranding');
+    } catch (err) {
+      console.warn('Failed to add rebranding lead to GetResponse:', err.message);
+    }
+
+    console.log(`Rebranding form submitted by ${email}`);
+    return respondForContactRequest(req, res, 200, { success: true, message: 'Thank you for your message' }, urls);
+
+  } catch (error) {
+    console.error('Rebranding webhook error:', error.message);
+    return respondForContactRequest(req, res, 500, { error: error.message }, urls);
+  }
+});
+// ============================================
 // SPAM FILTERING
 // ============================================
 
-function getContactRateLimitStatus(ipAddress) {
+function getClientIp(req) {
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (typeof forwardedFor === 'string' && forwardedFor.length > 0) {
+    return forwardedFor.split(',')[0].trim();
+  }
+
+  return req.ip || '';
+}
+
+function getContactRateLimitStatus(ipAddress, scope = 'contact') {
   const now = Date.now();
   const safeWindowMs = Number.isFinite(CONTACT_RATE_LIMIT_WINDOW_MS) && CONTACT_RATE_LIMIT_WINDOW_MS > 0
     ? CONTACT_RATE_LIMIT_WINDOW_MS
@@ -294,7 +390,7 @@ function getContactRateLimitStatus(ipAddress) {
     }
   }
 
-  const key = ipAddress || 'unknown';
+  const key = `:`;
   const existing = contactRateLimitStore.get(key);
 
   if (!existing || now - existing.windowStart > safeWindowMs) {
@@ -472,11 +568,13 @@ function buildRedirectUrl(baseUrl, payload = {}) {
   }
 }
 
-function respondForContactRequest(req, res, statusCode, payload) {
+function respondForContactRequest(req, res, statusCode, payload, urls = {}) {
   if (requestPrefersHtml(req)) {
+    const successUrl = urls.success || CONTACT_SUCCESS_REDIRECT_URL;
+    const errorUrl = urls.error || CONTACT_ERROR_REDIRECT_URL;
     const redirectBaseUrl = statusCode >= 400
-      ? (CONTACT_ERROR_REDIRECT_URL || CONTACT_SUCCESS_REDIRECT_URL)
-      : CONTACT_SUCCESS_REDIRECT_URL;
+      ? (errorUrl || successUrl)
+      : successUrl;
     const redirectUrl = buildRedirectUrl(redirectBaseUrl, payload);
 
     if (redirectUrl) {
@@ -491,7 +589,7 @@ function respondForContactRequest(req, res, statusCode, payload) {
 // SEND CONTACT EMAIL NOTIFICATION
 // ============================================
 
-async function sendContactEmailNotification(email, name, message) {
+async function sendContactEmailNotification(email, name, message, options = {}) {
   try {
     if (!process.env.ADMIN_EMAIL || !process.env.SMTP_HOST) {
       console.warn('Email configuration missing, skipping notification');
@@ -500,11 +598,12 @@ async function sendContactEmailNotification(email, name, message) {
 
     await transporter.sendMail({
       from: process.env.SMTP_USER,
-      to: process.env.ADMIN_EMAIL,
-      subject: `New Contact Form Submission from ${name || email}`,
+      to: options.to || process.env.ADMIN_EMAIL,
+      subject: `New ${options.formLabel || 'Contact'} Form Submission from ${name || email}`,
       html: `
-        <h2>New Contact Form Submission</h2>
+        <h2>New ${options.formLabel || 'Contact'} Form Submission</h2>
         <p><strong>From:</strong> ${escapeHtml(name || 'Anonymous')} (${escapeHtml(email)})</p>
+        ${options.budget ? `<p><strong>Budget:</strong> ${escapeHtml(options.budget)}</p>` : ''}
         <p><strong>Message:</strong></p>
         <p>${escapeHtml(message).replace(/\n/g, '<br>')}</p>
         <hr>
@@ -569,9 +668,11 @@ function extractEmailFromWebflowData(data) {
 
 async function addContactToGetResponse(email, webflowData, listType = 'newsletter') {
   const apiKey = process.env.GETRESPONSE_API_KEY;
-  const listId = listType === 'contacts'
-    ? process.env.GETRESPONSE_LIST_ID_CONTACTS
-    : process.env.GETRESPONSE_LIST_ID_NEWSLETTER;
+  const listIds = {
+    contacts: process.env.GETRESPONSE_LIST_ID_CONTACTS,
+    rebranding: process.env.GETRESPONSE_LIST_ID_REBRANDING
+  };
+  const listId = listIds[listType] || process.env.GETRESPONSE_LIST_ID_NEWSLETTER;
 
   if (!apiKey || !listId) {
     throw new Error('GetResponse API key or List ID not configured for ' + listType);
@@ -597,6 +698,8 @@ async function addContactToGetResponse(email, webflowData, listType = 'newslette
     const companyFieldId = process.env.GETRESPONSE_CUSTOM_FIELD_ID_COMPANY;
     const phoneFieldId = process.env.GETRESPONSE_CUSTOM_FIELD_ID_PHONE;
     const messageFieldId = process.env.GETRESPONSE_CUSTOM_FIELD_ID_MESSAGE;
+    const budgetFieldId = process.env.GETRESPONSE_CUSTOM_FIELD_ID_BUDGET;
+    const budget = listType === 'rebranding' ? extractBudgetFromWebflowData(webflowData) : '';
 
     if (companyFieldId && company) {
       customFieldValues.push({
@@ -616,6 +719,13 @@ async function addContactToGetResponse(email, webflowData, listType = 'newslette
       customFieldValues.push({
         customFieldId: messageFieldId,
         value: [message]
+      });
+    }
+
+    if (budgetFieldId && budget) {
+      customFieldValues.push({
+        customFieldId: budgetFieldId,
+        value: [budget]
       });
     }
 
@@ -731,6 +841,19 @@ function extractCompanyFromWebflowData(data) {
   return '';
 }
 
+function extractBudgetFromWebflowData(data) {
+  if (!data || typeof data !== 'object') return '';
+
+  for (const [key, value] of Object.entries(data)) {
+    const lowerKey = key.toLowerCase();
+    if ((lowerKey.includes('budget') || lowerKey.includes('bud\u017cet') || lowerKey.includes('budzet')) && typeof value === 'string') {
+      return value.trim();
+    }
+  }
+
+  return '';
+}
+
 function extractPhoneFromWebflowData(data) {
   if (!data || typeof data !== 'object') return '';
 
@@ -801,6 +924,7 @@ async function startServer() {
       console.log(`🚀 Webhook server running on port ${PORT}`);
       console.log(`📝 Webflow webhook endpoint: http://localhost:${PORT}/webhook/webflow`);
       console.log(`📧 Contact webhook endpoint: http://localhost:${PORT}/webhook/contact`);
+      console.log(`🎨 Rebranding webhook endpoint: http://localhost:${PORT}/webhook/rebranding`);
       console.log(`🏥 Health check: http://localhost:${PORT}/health`);
     });
 

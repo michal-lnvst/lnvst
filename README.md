@@ -11,6 +11,7 @@ Designed to be deployed on Koyeb and connected to Webflow forms.
 
 - `POST /webhook/newsletter`
 - `POST /webhook/contact`
+- `POST /webhook/rebranding`
 - `GET /health`
 
 Legacy compatibility:
@@ -34,6 +35,8 @@ Required for GetResponse:
 GETRESPONSE_API_KEY=your_api_key_here
 GETRESPONSE_LIST_ID_NEWSLETTER=your_newsletter_campaign_id_here
 GETRESPONSE_LIST_ID_CONTACTS=your_contact_leads_campaign_id_here
+GETRESPONSE_LIST_ID_REBRANDING=your_rebranding_leads_campaign_id_here
+GETRESPONSE_CUSTOM_FIELD_ID_BUDGET=
 ```
 
 Optional for additional contact data in GetResponse:
@@ -130,6 +133,7 @@ Configure your forms to POST to these URLs:
 
 - newsletter form -> `https://your-service.koyeb.app/webhook/newsletter`
 - contact form -> `https://your-service.koyeb.app/webhook/contact`
+- rebranding form -> `https://your-service.koyeb.app/webhook/rebranding` (requires a budget field; optional `REBRANDING_NOTIFY_EMAIL` (default lena@lenivastudio.com), `REBRANDING_SUCCESS_REDIRECT_URL`, `REBRANDING_ERROR_REDIRECT_URL`)
 
 The newsletter endpoint tries to extract the email from common field names such as `email` or any key containing `email`.
 
