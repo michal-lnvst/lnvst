@@ -591,14 +591,15 @@ function respondForContactRequest(req, res, statusCode, payload, urls = {}) {
 
 async function sendContactEmailNotification(email, name, message, options = {}) {
   try {
-    if (!process.env.ADMIN_EMAIL || !process.env.SMTP_HOST) {
+    const recipient = options.to || process.env.ADMIN_EMAIL;
+    const useResend = Boolean(process.env.RESEND_API_KEY);
+
+    if (!recipient || (!useResend && !process.env.SMTP_HOST)) {
       console.warn('Email configuration missing, skipping notification');
       return;
     }
 
-    await transporter.sendMail({
-      from: process.env.SMTP_USER,
-      to: options.to || process.env.ADMIN_EMAIL,
+    const mail = {
       subject: `New ${options.formLabel || 'Contact'} Form Submission from ${name || email}`,
       html: `
         <h2>New ${options.formLabel || 'Contact'} Form Submission</h2>
@@ -611,11 +612,35 @@ async function sendContactEmailNotification(email, name, message, options = {}) 
           Submitted at: ${new Date().toISOString()}
         </p>
       `
-    });
+    };
+
+    if (useResend) {
+      await axios.post(
+        'https://api.resend.com/emails',
+        {
+          from: process.env.RESEND_FROM || 'onboarding@resend.dev',
+          to: [recipient],
+          reply_to: email,
+          subject: mail.subject,
+          html: mail.html
+        },
+        {
+          headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+          timeout: 15000
+        }
+      );
+    } else {
+      await transporter.sendMail({
+        from: process.env.SMTP_USER,
+        to: recipient,
+        replyTo: email,
+        ...mail
+      });
+    }
 
     console.log(`Email notification sent for ${email}`);
   } catch (error) {
-    console.error('Failed to send email notification:', error.message);
+    console.error('Failed to send email notification:', error.response?.data ? JSON.stringify(error.response.data) : error.message);
     throw error;
   }
 }

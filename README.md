@@ -175,7 +175,7 @@ DATABASE_PATH=/data/app.db
 
 If you keep `DATABASE_PATH=./data/app.db` in production, logs may be lost on instance replacement.
 
-Optional SMTP variables can be added later.
+Email notifications: set `RESEND_API_KEY` (and `RESEND_FROM`, a sender on a domain verified in Resend) to send via the Resend HTTPS API; otherwise the SMTP variables are used.
 
 ## Behavior Summary
 
@@ -193,7 +193,7 @@ Optional SMTP variables can be added later.
   - optional minimum form-fill time check
   - per-IP rate limiting
 - stores submission in SQLite
-- attempts email notification if SMTP is configured
+- attempts email notification if Resend or SMTP is configured
 - attempts to add the contact to the GetResponse contacts list
 - optionally maps company/phone/message to GetResponse custom fields
 
