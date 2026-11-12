@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Kalkulator wdrożenia — LNVST</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.mjs"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="LNVST — kalkulator wdrożenia"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 157 31" fill="none" aria-hidden="true"><path d="M0 0.500337H3.78375V27.456H19.9112V30.5205H0V0.500337Z" fill="currentColor"/><path d="M25.5917 0.500337H29.8716L44.9239 24.6207H45.3374V0.500337H49.0385V30.5205H44.7585L29.6855 6.40013H29.272V30.5205H25.5917V0.500337Z" fill="currentColor"/><path d="M54.7616 0.500337H58.5247L67.8496 25.9549H68.2632L77.6088 0.500337H81.3512V1.12576L70.1861 30.5205H65.9268L54.7616 1.12576V0.500337Z" fill="currentColor"/><path d="M92.6553 13.3423C88.6441 13.3423 85.8735 10.5696 85.8735 6.67115C85.8735 2.7727 88.6441 0 92.6553 0C96.6458 0 99.4164 2.7727 99.4164 6.67115C99.4164 10.5696 96.6458 13.3423 92.6553 13.3423Z" fill="currentColor"/><path d="M105.394 8.25555C105.394 3.37727 109.467 0.0208483 116.311 0.0208483C123.134 0.0208483 127.435 3.31473 127.807 8.65165V9.27707H124.209C124.023 4.79489 120.653 2.98117 116.373 2.98117C112.093 2.98117 109.157 4.83658 109.157 8.15131C109.157 11.4035 111.762 12.6543 115.67 13.3631L119.247 14.0303C124.623 15.0101 128.551 17.0323 128.551 22.3067C128.551 27.6644 124.313 31 117.179 31C110.087 31 105.208 27.6644 104.67 22.265V21.6395H108.33C108.888 26.2051 112.61 28.0397 117.159 28.0397C121.666 28.0397 124.809 26.2051 124.809 22.536C124.809 18.9502 121.831 17.887 117.82 17.1574L114.243 16.4902C109.053 15.5521 105.394 13.1755 105.394 8.25555Z" fill="currentColor"/><path d="M131.692 0.500337H157V3.5649H146.248V30.5205H142.444V3.5649H131.692V0.500337Z" fill="currentColor"/></svg></a>
+    <div class="topbar-note"><span class="status-dot"></span>NARZĘDZIE WEWNĘTRZNE <span class="topbar-separator">/</span> WEBFLOW</div>
+  </header>
+
+  <main class="layout">
+    <div class="workspace">
+      <section class="intro">
+        <div class="eyebrow"><span>LNVST / INTERNAL TOOLS</span><span class="line"></span><span>KALKULATOR 01</span></div>
+        <h1>Website framework</h1>
+        <div class="notice"><span>i</span><p>To wstępny kosztorys techniczny, nie gotowa oferta dla klienta. Ceny pochodzą z przekazanego briefu i wymagają weryfikacji przed wyceną.</p></div>
+      </section>
+
+      <section class="section" aria-labelledby="hosting-title">
+        <div class="section-heading"><div><span class="section-number">01 / PUNKT WYJŚCIA</span><h2 id="hosting-title">Hosting i języki<span class="heading-dot">.</span></h2></div><p>Wybór hostingu określa<br>sposób wdrożenia języków.</p></div>
+        <div class="project-settings">
+          <label for="hosting"><strong>Gdzie będzie działać strona?</strong><small>Zmiana hostingu nie usuwa wybranych modułów ani planów.</small></label>
+          <select id="hosting">
+            <option value="webflow">Hosting Webflow</option>
+            <option value="export">Eksport poza Webflow</option>
+          </select>
+          <label for="languages"><strong>Dodatkowe wersje językowe</strong><small>Nie licz języka podstawowego. Wpisz 0, jeśli strona jest jednojęzyczna.</small></label>
+          <input id="languages" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" aria-describedby="language-estimate">
+          <p id="language-estimate" class="language-estimate"></p>
+        </div>
+        <div id="hosting-subscription" class="subscriptions"></div>
+        <p class="hint">Koszt Webflow Localization oraz zewnętrznego hostingu i SSL nie jest automatycznie doliczany. Sprawdź dostępność i ceny odpowiednich planów. Czas wdrożenia formularzy obejmuje podstawowy frontend i integrację, bez projektu UX/UI.</p>
+      </section>
+
+      <section class="section" aria-labelledby="modules-title">
+        <div class="section-heading"><div><span class="section-number">02 / ZAKRES PRAC I NARZĘDZIA</span><h2 id="modules-title">Zbuduj swój zakres<span class="heading-dot">.</span></h2></div><p>Wybierz moduły i plany usług.<br>Godziny są orientacyjne.</p></div>
+        <div id="modules"></div>
+        <p class="hint">Koszty narzędzi podane są osobno od robocizny. Ceny z briefu są orientacyjne i wymagają weryfikacji; nie przeliczamy walut. Koszty zależne od użycia, VAT i budżety reklamowe nie są uwzględnione.</p>
+      </section>
+    </div>
+
+    <aside class="summary-wrap" aria-label="Podsumowanie wyceny">
+      <div class="summary">
+        <div class="summary-top"><span>TWÓJ KOSZTORYS</span><span class="summary-mark">↗</span></div>
+        <h2>Podsumowanie<span>.</span></h2>
+        <p class="summary-intro">Orientacyjny zakres prac technicznych</p>
+        <div class="total-label">SZACOWANY CZAS</div>
+        <div class="hero-total" id="hours-total">0–0 <small>h</small></div>
+        <div class="summary-meta"><span id="selected-count">0 modułów</span><span>praca jednorazowa</span></div>
+        <div class="summary-context"><span id="hosting-summary"></span><span id="languages-summary"></span></div>
+        <div class="summary-divider"></div>
+        <label class="field-label" for="rate">Twoja stawka <span>PLN / h</span></label>
+        <input id="rate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Wpisz stawkę" aria-describedby="rate-hint">
+        <p class="field-hint" id="rate-hint">Opcjonalnie, bez VAT.</p>
+        <label class="field-label" for="adjustment">Korekta czasu <span>h</span></label>
+        <input id="adjustment" type="number" step="0.25" inputmode="decimal" value="0" aria-describedby="adjustment-hint">
+        <p class="field-hint" id="adjustment-hint">Ta sama liczba godzin dla obu końców zakresu. Użyj wartości ujemnej, aby uwzględnić wspólną pracę.</p>
+        <p id="input-error" class="error" role="alert" hidden></p>
+        <div class="summary-divider"></div>
+        <div class="result-row"><span>Robocizna jednorazowa</span><strong id="labor-total">Podaj stawkę</strong></div>
+        <div class="result-row"><span>Narzędzia / miesiąc</span><strong id="monthly-total">0 PLN + 0 USD</strong></div>
+        <p class="field-hint" id="cost-note"></p>
+        <div id="warnings" class="warnings" aria-live="polite"></div>
+        <button class="print-button" type="button" id="print">Drukuj podsumowanie <span>↗</span></button>
+        <button class="reset-button" type="button" id="reset">Wyczyść wybór</button>
+        <p class="privacy-note">Dane pozostają w tej przeglądarce. Odświeżenie strony resetuje wybór.</p>
+      </div>
+    </aside>
+  </main>
+  <footer><span>LNVST® — WEBFLOW DEVELOPMENT FRAMEWORK</span><span>WEWNĘTRZNE NARZĘDZIE ROBOCZE / 2026</span></footer>
+</body>
+</html>

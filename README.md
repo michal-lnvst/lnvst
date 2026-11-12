@@ -7,6 +7,10 @@ Node.js service for handling:
 
 Designed to be deployed on Koyeb and connected to Webflow forms.
 
+## Webflow estimate calculator
+
+The independent, static internal calculator is in [`kalkulator/`](./kalkulator/README.md). It can be deployed separately on GitHub Pages and does not use this webhook service.
+
 ## Endpoints
 
 - `POST /webhook/newsletter`
