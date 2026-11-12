@@ -1,22 +1,59 @@
-import { allItems, subscriptions, complexityLevels } from "./data.mjs";
+import { allItems, subscriptions, complexityLevels, interactiveTypes, projectTiers } from "./data.mjs";
 
-export function calculate(selected, plans, rateText, adjustmentText, hosting = "webflow", languagesText = "0", components = []) {
+export function getItemRange(item, tier) {
+  const factor = item[0].startsWith("animation-") || item[0] === "qa" ? (tier ? tier.scale : 0) : 1;
+  return { min: item[3] * factor, max: item[4] * factor };
+}
+
+export function calculate(selected, plans, rateText, adjustmentText, hosting = "webflow", languagesText = "0", components = [], mode = "internal", quantities = {}, tierId = "", includeDesign = true, includeDevelopment = true) {
   if (!["webflow", "export"].includes(hosting)) throw new Error(`Nieznany hosting: ${hosting}`);
+  if (!["internal", "external"].includes(mode)) throw new Error(`Nieznany wykonawca: ${mode}`);
+  const tier = projectTiers.find(entry => entry.id === tierId);
+  if (tierId && !tier) throw new Error(`Nieznany tier strony: ${tierId}`);
+  const scale = tier ? tier.scale : 0;
   const items = allItems.filter(([id]) => selected.has(id));
   const languages = languagesText.trim() === "" ? NaN : Number(languagesText);
   const validLanguages = Number.isSafeInteger(languages) && languages >= 0 && languages <= 100;
-  const languageMin = validLanguages ? languages * (hosting === "webflow" ? 2 : 4) : 0;
-  const languageMax = validLanguages ? languages * (hosting === "webflow" ? 8 : 16) : 0;
+  const languageMin = validLanguages ? languages * (hosting === "webflow" ? 2 : 4) * scale : 0;
+  const languageMax = validLanguages ? languages * (hosting === "webflow" ? 8 : 16) * scale : 0;
   const componentErrors = components.some(component => !["animation", "cms"].includes(component.category) ||
-    typeof component.name !== "string" || !component.name.trim() || !Object.hasOwn(complexityLevels, component.level));
-  const componentMin = components.reduce((sum, component) => sum + (Object.hasOwn(complexityLevels, component.level) ? complexityLevels[component.level].min : 0), 0);
-  const componentMax = components.reduce((sum, component) => sum + (Object.hasOwn(complexityLevels, component.level) ? complexityLevels[component.level].max : 0), 0);
-  const rawMin = items.reduce((sum, item) => sum + item[3], 0) + languageMin + componentMin;
-  const rawMax = items.reduce((sum, item) => sum + item[4], 0) + languageMax + componentMax;
+    typeof component.name !== "string" || !Object.hasOwn(complexityLevels, component.level));
+  const completedComponents = components.filter(component => typeof component.name === "string" && component.name.trim() && Object.hasOwn(complexityLevels, component.level) && ["animation", "cms"].includes(component.category));
+  const incompleteComponents = components.filter(component => typeof component.name === "string" && !component.name.trim()).length;
+  const componentMin = completedComponents.reduce((sum, component) => sum + complexityLevels[component.level].min, 0);
+  const componentMax = completedComponents.reduce((sum, component) => sum + complexityLevels[component.level].max, 0);
+  const designItems = items.filter(([id]) => id === "newsletter-template");
+  const handoffItems = items.filter(([id]) => id.startsWith("handoff-"));
+  const devItems = items.filter(item => !designItems.includes(item) && !handoffItems.includes(item));
+  const sumRange = entries => entries.reduce((sum, item) => { const range = getItemRange(item, tier); sum.min += range.min; sum.max += range.max; return sum; }, { min: 0, max: 0 });
+  const design = sumRange(designItems);
+  if (tier && includeDesign) { design.min += tier.design[0]; design.max += tier.design[1]; }
+  const handoff = mode === "external" ? sumRange(handoffItems) : { min: 0, max: 0 };
+  const quantityErrors = interactiveTypes.some(type => {
+    const raw = quantities[type.id] === undefined ? "0" : String(quantities[type.id]);
+    const value = raw.trim() === "" ? NaN : Number(raw);
+    return !Number.isSafeInteger(value) || value < 0 || value > 100;
+  });
+  const interactive = interactiveTypes.reduce((sum, type) => {
+    const raw = quantities[type.id] === undefined ? "0" : String(quantities[type.id]);
+    const n = raw.trim() === "" ? NaN : Number(raw);
+    if (Number.isSafeInteger(n) && n >= 0 && n <= 100) {
+      sum.min += n * type.min;
+      sum.max += n * type.max;
+    }
+    return sum;
+  }, { min: 0, max: 0 });
+  const development = sumRange(devItems);
+  if (tier && includeDevelopment) { development.min += tier.development[0]; development.max += tier.development[1]; }
+  development.min += componentMin + languageMin + interactive.min;
+  development.max += componentMax + languageMax + interactive.max;
+  const rawMin = design.min + handoff.min + (mode === "internal" ? development.min : 0);
+  const rawMax = design.max + handoff.max + (mode === "internal" ? development.max : 0);
   const adjustment = adjustmentText.trim() === "" ? 0 : Number(adjustmentText);
   const rate = rateText.trim() === "" ? null : Number(rateText);
   const errors = [];
-  if (componentErrors) errors.push("Podaj nazwę i poprawny poziom złożoności każdej pozycji animacji i CMS.");
+  if (quantityErrors) errors.push("Podaj liczbę komponentów od 0 do 100 dla każdej kategorii.");
+  if (componentErrors) errors.push("Nieprawidłowa kategoria, nazwa lub poziom pozycji animacji i CMS.");
   if (!validLanguages) errors.push("Podaj liczbę dodatkowych wersji językowych od 0 do 100.");
   if (!Number.isFinite(adjustment)) errors.push("Podaj poprawną korektę czasu.");
   if (Number.isFinite(adjustment) && rawMin + adjustment < 0) errors.push("Korekta nie może zmniejszyć dolnej granicy czasu poniżej zera.");
@@ -29,18 +66,16 @@ export function calculate(selected, plans, rateText, adjustmentText, hosting = "
     if (option.price === null) unknownCosts.push(service.label);
     else monthly[option.currency] += option.price;
   }
-  return { items, components, componentMin, componentMax, languages, languageMin, languageMax, rawMin, rawMax, min: rawMin + adjustment, max: rawMax + adjustment, rate, monthly, unknownCosts, errors };
+  return { items, components, completedComponents, incompleteComponents, tier, componentMin, componentMax, design, handoff, development, interactive, languages, languageMin, languageMax, rawMin, rawMax, min: rawMin + adjustment, max: rawMax + adjustment, rate, monthly, unknownCosts, errors };
 }
 
 export function getWarnings(selected, plans, hosting = "webflow", languages = 0, components = []) {
   const warnings = [];
   const has = id => selected.has(id);
-  const hasCms = has("google-maps-cms") || components.some(component => component.category === "cms");
+  const hasCms = has("google-maps-cms") || has("cms-small") || has("cms-large") || components.some(component => component.category === "cms");
   if (has("form-worker") && (has("newsletter-worker") || has("sender-worker"))) warnings.push("Formularz i newsletter mogą korzystać ze wspólnego Workera. Sprawdź zakres i skoryguj godziny.");
-  if (has("worker-setup") && (has("form-worker") || has("newsletter-worker") || has("sender-worker"))) warnings.push("Konfiguracja Workera może być już zawarta w wybranej integracji.");
   if (has("cookie-analytics") && (has("analytics-ga4") || has("analytics-gtm"))) warnings.push("CookieZen + GA4 + GTM zawiera już konfigurację analityki. Unikaj podwójnego liczenia.");
   if (has("ads") && has("marketing-extra")) warnings.push("Dodatkowy skrypt marketingowy może pokrywać się z wybranym tagiem Ads / Meta Pixel.");
-  if (has("cloudflare-dns") && has("dns-domain")) warnings.push("Konfiguracja Cloudflare DNS może pokrywać się z podłączeniem domeny.");
   if (has("export-forms") && (has("form-web3") || has("form-worker"))) warnings.push("Prace nad formularzem po eksporcie mogą pokrywać się z wybranym wariantem formularza.");
   if (hosting === "export") {
     warnings.push("Koszt zewnętrznego hostingu, domeny i SSL nie jest doliczony. Sprawdź zakres eksportu, konfigurację serwera i publikację.");
@@ -69,7 +104,7 @@ export function getWarnings(selected, plans, hosting = "webflow", languages = 0,
   if ((has("sender-embed") || has("sender-worker")) && (has("newsletter-optin") || has("newsletter-automation"))) warnings.push("Dostępność double opt-in i automatyzacji w Sender zależy od wybranego planu; sprawdź zakres i estymację.");
   if ((has("cookie-basic") || has("cookie-analytics")) && plans.cookiezen === "none") warnings.push("Wybrano CookieZen, ale nie wybrano jego planu.");
   if (plans.cookiezen === "free") warnings.push("CookieZen Free według briefu wymaga karty; przekroczenie limitu może podnieść plan i koszt.");
-  if (has("form-worker") || has("newsletter-worker") || has("sender-worker") || has("worker-setup")) warnings.push("Koszt Cloudflare Workers zależy od użycia i planu; nie został doliczony.");
+  if (has("form-worker") || has("newsletter-worker") || has("sender-worker")) warnings.push("Koszt Cloudflare Workers zależy od użycia i planu; nie został doliczony.");
   if (has("form-web3")) warnings.push("Koszt Web3Forms zależy od planu i limitów; nie został doliczony.");
   if (has("form-integration")) warnings.push("Koszt zewnętrznej integracji formularza nie został doliczony.");
   if ((selected.size > 0 || components.length > 0) && !has("qa")) warnings.push("Nie wybrano końcowych testów QA. Uwzględnij je w zakresie lub osobnej wycenie.");

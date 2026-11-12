@@ -19,16 +19,25 @@
       <section class="intro">
         <div class="eyebrow"><span>LNVST / INTERNAL TOOLS</span><span class="line"></span><span>KALKULATOR 01</span></div>
         <h1>Website framework</h1>
-        <div class="notice"><span>i</span><p>To wstępny kosztorys techniczny, nie gotowa oferta dla klienta. Ceny pochodzą z przekazanego briefu i wymagają weryfikacji przed wyceną.</p></div>
+        <div class="notice"><span>i</span><p>To wstępna estymacja, nie gotowa oferta. Nowe widełki są roboczymi założeniami do kalibracji, nie wynikają bezpośrednio z historycznych pomiarów.</p></div>
       </section>
 
       <section class="section" aria-labelledby="hosting-title">
-        <div class="section-heading"><div><span class="section-number">01 / PUNKT WYJŚCIA</span><h2 id="hosting-title">Hosting i języki<span class="heading-dot">.</span></h2></div><p>Wybór hostingu określa<br>sposób wdrożenia języków.</p></div>
+        <div class="section-heading"><div><span class="section-number">01 / PUNKT WYJŚCIA</span><h2 id="hosting-title">Strona i hosting<span class="heading-dot">.</span></h2></div><p>Wybierz wielkość strony<br>oraz sposób wdrożenia.</p></div>
         <div class="project-settings">
+          <label for="project-tier"><strong>Wielkość strony</strong><small>Wspólny tier dla projektu i wdrożenia. Wpływa też na animacje, języki i końcowe QA.</small></label>
+          <select id="project-tier"></select>
+          <div class="tier-details" id="tier-details">Wybierz tier, aby uwzględnić zakres strony i wycenić skalowane elementy.</div>
+          <div class="tier-options"><label><input id="include-design" type="checkbox" checked> Uwzględnij projekt UX/UI</label><label><input id="include-development" type="checkbox" checked> Uwzględnij bazowe wdrożenie LNVST</label></div>
           <label for="hosting"><strong>Gdzie będzie działać strona?</strong><small>Zmiana hostingu nie usuwa wybranych modułów ani planów.</small></label>
           <select id="hosting">
             <option value="webflow">Hosting Webflow</option>
             <option value="export">Eksport poza Webflow</option>
+          </select>
+          <label for="implementation"><strong>Kto wdraża stronę?</strong><small>Wariant zewnętrzny nie dolicza pracy developerów do naszych godzin.</small></label>
+          <select id="implementation">
+            <option value="internal">Wdrożenie LNVST</option>
+            <option value="external">Wdrożenie zewnętrzne</option>
           </select>
           <label for="languages"><strong>Dodatkowe wersje językowe</strong><small>Nie licz języka podstawowego. Wpisz 0, jeśli strona jest jednojęzyczna.</small></label>
           <input id="languages" type="number" min="0" max="100" step="1" value="0" inputmode="numeric" aria-describedby="language-estimate">
@@ -41,6 +50,7 @@
       <section class="section" aria-labelledby="modules-title">
         <div class="section-heading"><div><span class="section-number">02 / ZAKRES PRAC I NARZĘDZIA</span><h2 id="modules-title">Zbuduj swój zakres<span class="heading-dot">.</span></h2></div><p>Wybierz moduły i plany usług.<br>Godziny są orientacyjne.</p></div>
         <div id="modules"></div>
+        <details class="references"><summary>Porównaj z realizacjami</summary><p>Cały development obejmował również CMS, animacje i integracje — nie są to stawki za bazowy frontend ani dodatkowe godziny do sumy.</p><ul><li>more: projekt 25 h, development 35 h</li><li>Ace of Space: projekt 64 h, development 116 h</li><li>Trigon: UX 51 h + UI 87 h, development 177 h rzeczywiście; dzisiejsza ocena developmentu około 106 h.</li></ul></details>
         <p class="hint">Koszty narzędzi podane są osobno od robocizny. Ceny z briefu są orientacyjne i wymagają weryfikacji; nie przeliczamy walut. Koszty zależne od użycia, VAT i budżety reklamowe nie są uwzględnione.</p>
       </section>
     </div>
@@ -49,11 +59,11 @@
       <div class="summary">
         <div class="summary-top"><span>TWÓJ KOSZTORYS</span><span class="summary-mark">↗</span></div>
         <h2>Podsumowanie<span>.</span></h2>
-        <p class="summary-intro">Orientacyjny zakres prac technicznych</p>
+        <p class="summary-intro">Orientacyjny zakres naszej pracy</p>
         <div class="total-label">SZACOWANY CZAS</div>
         <div class="hero-total" id="hours-total">0–0 <small>h</small></div>
         <div class="summary-meta"><span id="selected-count">0 modułów</span><span>praca jednorazowa</span></div>
-        <div class="summary-context"><span id="hosting-summary"></span><span id="languages-summary"></span></div>
+        <div class="summary-context"><span id="tier-summary"></span><span id="mode-summary"></span><span id="hosting-summary"></span><span id="languages-summary"></span></div>
         <div class="summary-divider"></div>
         <label class="field-label" for="rate">Twoja stawka <span>PLN / h</span></label>
         <input id="rate" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Wpisz stawkę" aria-describedby="rate-hint">
@@ -63,6 +73,12 @@
         <p class="field-hint" id="adjustment-hint">Ta sama liczba godzin dla obu końców zakresu. Użyj wartości ujemnej, aby uwzględnić wspólną pracę.</p>
         <p id="input-error" class="error" role="alert" hidden></p>
         <div class="summary-divider"></div>
+        <div class="result-row"><span>Projekt UX/UI i szablon</span><strong id="design-total">0–0 h</strong></div>
+        <div class="result-row" id="handoff-row" hidden><span>Handoff i design QA</span><strong id="handoff-total">0–0 h</strong></div>
+        <div class="result-row"><span id="development-label">Wdrożenie i moduły</span><strong id="development-total">0–0 h</strong></div>
+        <div class="result-row"><span>Korekta czasu</span><strong id="adjustment-total">0 h</strong></div>
+        <p id="external-note" class="field-hint" hidden>Wdrożenie zewnętrzne i jego koszty nie są doliczane. Wybrane moduły opisują wymagany zakres dla wykonawcy; szablon newslettera traktujemy jako naszą pracę projektową.</p>
+        <p class="field-hint">Nowe widełki to robocze założenia wymagające kalibracji dla projektu.</p>
         <div class="result-row"><span>Robocizna jednorazowa</span><strong id="labor-total">Podaj stawkę</strong></div>
         <div class="result-row"><span>Narzędzia / miesiąc</span><strong id="monthly-total">0 PLN + 0 USD</strong></div>
         <p class="field-hint" id="cost-note"></p>
