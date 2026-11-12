@@ -1,8 +1,9 @@
 import { allItems, subscriptions, complexityLevels, interactiveTypes, projectTiers } from "./data.mjs";
 
 export function getItemRange(item, tier) {
-  const factor = item[0].startsWith("animation-") || item[0] === "qa" ? (tier ? tier.scale : 0) : 1;
-  return { min: item[3] * factor, max: item[4] * factor };
+  const scaled = item[0].startsWith("animation-") || item[0] === "qa" || item[0].startsWith("handoff-");
+  const factor = scaled ? (tier ? (item[0].startsWith("handoff-") ? tier.handoffScale : tier.scale) : 0) : 1;
+  return { min: Math.round(item[3] * factor * 4) / 4, max: Math.round(item[4] * factor * 4) / 4 };
 }
 
 export function calculate(selected, plans, rateText, adjustmentText, hosting = "webflow", languagesText = "0", components = [], mode = "internal", quantities = {}, tierId = "", includeDesign = true, includeDevelopment = true) {
@@ -56,6 +57,7 @@ export function calculate(selected, plans, rateText, adjustmentText, hosting = "
   if (componentErrors) errors.push("Nieprawidłowa kategoria, nazwa lub poziom pozycji animacji i CMS.");
   if (!validLanguages) errors.push("Podaj liczbę dodatkowych wersji językowych od 0 do 100.");
   if (!Number.isFinite(adjustment)) errors.push("Podaj poprawną korektę czasu.");
+  if (Number.isFinite(adjustment) && !Number.isInteger(adjustment * 4)) errors.push("Korekta czasu musi być wielokrotnością 0,25 h.");
   if (Number.isFinite(adjustment) && rawMin + adjustment < 0) errors.push("Korekta nie może zmniejszyć dolnej granicy czasu poniżej zera.");
   if (rate !== null && (!Number.isFinite(rate) || rate < 0)) errors.push("Stawka musi być liczbą nieujemną.");
   const monthly = { PLN: 0, USD: 0 };

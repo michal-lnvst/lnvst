@@ -7,9 +7,9 @@ const noPlans = Object.fromEntries(subscriptions.map(service => [service.id, "no
 
 test("pięć tierów dolicza projekt, bazę oraz właściwie skaluje animacje, języki i QA", () => {
   const tiers = [
-    ["landing", [14, 24.5], [7.2, 14.4], 1],
-    ["landing-long", [21, 35], [13.2, 24], 1.25],
-    ["company-small", [24.5, 42], [16.8, 30], 1.5],
+    ["landing", [14, 24.5], [7.25, 14.5], 1],
+    ["landing-long", [21, 35], [13.25, 24], 1.25],
+    ["company-small", [24.5, 42], [16.75, 30], 1.5],
     ["company", [31.5, 56], [21, 39], 2],
     ["service", [63, 105], [36, 66], 2.5]
   ];
@@ -17,7 +17,8 @@ test("pięć tierów dolicza projekt, bazę oraz właściwie skaluje animacje, j
   for (const [id, design, development, factor] of tiers) {
     const result = calculate(new Set(["animation-scroll", "qa", "form-native"]), noPlans, "", "0", "webflow", "2", [], "internal", {}, id);
     assert.deepEqual(result.design, { min: design[0], max: design[1] }, id);
-    assert.deepEqual(result.development, { min: development[0] + 11.5 * factor + 2, max: development[1] + 31.5 * factor + 3 }, id);
+    const qa = Math.round(1.5 * factor * 4) / 4;
+    assert.deepEqual(result.development, { min: development[0] + 10 * factor + qa + 2, max: development[1] + 30 * factor + qa + 3 }, id);
     assert.deepEqual([result.languageMin, result.languageMax], [4 * factor, 16 * factor], id);
     const exclude = calculate(new Set(), noPlans, "", "0", "webflow", "0", [], "internal", {}, id, false, false);
     assert.deepEqual([exclude.min, exclude.max], [0, 0], id);
@@ -73,28 +74,51 @@ test("tryb zewnętrzny zachowuje zakres i koszty, dolicza projekt i handoff, wyk
   const plans = { ...noPlans, webflow: "cms", sender: "unknown" };
   const external = calculate(selected, plans, "200", "-2", "export", "2", components, "external", quantities, "landing");
   assert.deepEqual(external.design, { min: 18, max: 32.5 });
-  assert.deepEqual(external.handoff, { min: 12, max: 28 });
-  assert.deepEqual(external.development, { min: 68.2, max: 160.4 });
-  assert.deepEqual([external.rawMin, external.rawMax, external.min, external.max], [30, 60.5, 28, 58.5]);
-  assert.deepEqual([external.min * external.rate, external.max * external.rate], [5600, 11700]);
+  assert.deepEqual(external.handoff, { min: 3, max: 7 });
+  assert.deepEqual(external.development, { min: 68.25, max: 160.5 });
+  assert.deepEqual([external.rawMin, external.rawMax, external.min, external.max], [21, 39.5, 19, 37.5]);
+  assert.deepEqual([external.min * external.rate, external.max * external.rate], [3800, 7500]);
   assert.deepEqual(external.monthly, { PLN: 0, USD: 25 });
   assert.deepEqual(external.unknownCosts, ["Sender"]);
   assert.deepEqual(external.errors, []);
   const internal = calculate(selected, plans, "200", "-2", "export", "2", components, "internal", quantities, "landing");
   assert.deepEqual(internal.handoff, { min: 0, max: 0 });
-  assert.deepEqual([internal.rawMin, internal.rawMax, internal.min, internal.max], [86.2, 192.9, 84.2, 190.9]);
+  assert.deepEqual([internal.rawMin, internal.rawMax, internal.min, internal.max], [86.25, 193, 84.25, 191]);
   assert.deepEqual(calculate(selected, plans, "200", "-2", "export", "2", components, "external", quantities, "landing"), external);
   assert.throws(() => calculate(selected, plans, "", "", "export", "0", [], "invalid"));
 });
 
-test("wszystkie opcje handoffu są naliczane tylko przy wdrożeniu zewnętrznym", () => {
+test("wszystkie opcje handoffu skalują się według tieru i tylko przy wdrożeniu zewnętrznym", () => {
   const expected = [["handoff-components", 6, 14], ["handoff-interactions", 4, 12], ["handoff-prototype", 3, 10], ["handoff-meeting", 3, 8], ["handoff-qa", 6, 14]];
-  for (const [id, min, max] of expected) {
-    const selected = new Set([id]);
-    assert.deepEqual([calculate(selected, noPlans, "", "0").min, calculate(selected, noPlans, "", "0").max], [0, 0]);
-    const external = calculate(selected, noPlans, "", "0", "webflow", "0", [], "external");
-    assert.deepEqual([external.min, external.max], [min, max]);
+  const tiers = [["landing", 0.25], ["landing-long", 0.375], ["company-small", 0.75], ["company", 1], ["service", 1.25]];
+  for (const [tier, factor] of tiers) {
+    for (const [id, min, max] of expected) {
+      const selected = new Set([id]);
+      const internal = calculate(selected, noPlans, "", "0", "webflow", "0", [], "internal", {}, tier, false, false);
+      assert.deepEqual([internal.min, internal.max], [0, 0], `${tier}: ${id}`);
+      const external = calculate(selected, noPlans, "200", "0", "webflow", "0", [], "external", {}, tier, false, false);
+      const expectedMin = Math.round(min * factor * 4) / 4;
+      const expectedMax = Math.round(max * factor * 4) / 4;
+      assert.deepEqual([external.min, external.max], [expectedMin, expectedMax], `${tier}: ${id}`);
+      assert.deepEqual([external.min * external.rate, external.max * external.rate], [expectedMin * 200, expectedMax * 200]);
+    }
   }
+  const selected = new Set(expected.map(([id]) => id));
+  const noTier = calculate(selected, noPlans, "", "0", "webflow", "0", [], "external");
+  assert.deepEqual([noTier.min, noTier.max], [0, 0]);
+  const combined = calculate(selected, noPlans, "", "0", "webflow", "0", [], "external", {}, "company", false, false);
+  assert.deepEqual([combined.min, combined.max], [22, 58]);
+});
+
+test("zaokrągla osobne zakresy handoffu oraz QA do kwadransów przed sumowaniem", () => {
+  const selected = new Set(["handoff-prototype", "handoff-meeting"]);
+  const result = calculate(selected, noPlans, "200", "0.25", "webflow", "0", [], "external", {}, "landing-long", false, false);
+  assert.deepEqual(result.handoff, { min: 2.5, max: 6.75 });
+  assert.deepEqual([result.min, result.max], [2.75, 7]);
+  assert.deepEqual([result.min * result.rate, result.max * result.rate], [550, 1400]);
+  const qa = calculate(new Set(["qa"]), noPlans, "", "0", "webflow", "0", [], "internal", {}, "landing-long", false, false);
+  assert.deepEqual([qa.min, qa.max], [2, 2]);
+  assert.ok(calculate(selected, noPlans, "", "0.1", "webflow", "0", [], "external", {}, "landing").errors.some(text => text.includes("0,25 h")));
 });
 
 test("tiery CMS wpływają na ostrzeżenia planów i eksportu", () => {

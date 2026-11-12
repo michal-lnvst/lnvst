@@ -61,12 +61,12 @@ function update() {
   const valid = result.errors.length === 0;
   const languageUnit = result.tier ? `${formatNumber((hosting === "webflow" ? 2 : 4) * result.tier.scale)}–${formatNumber((hosting === "webflow" ? 8 : 16) * result.tier.scale)} h` : "wybierz tier strony";
   $("#language-estimate").textContent = `${hosting === "webflow" ? "Webflow Localization (tłumaczenie maszynowe)" : "Ręczne wdrożenie po eksporcie"}: ${languageUnit} za każdą dodatkową wersję.`;
-  $("#tier-details").textContent = result.tier ? `${result.tier.detail}. Projekt: ${formatNumber(result.tier.design[0])}–${formatNumber(result.tier.design[1])} h; bazowe wdrożenie: ${formatNumber(result.tier.development[0])}–${formatNumber(result.tier.development[1])} h. Mnożnik animacji, języków i QA: ×${formatNumber(result.tier.scale)}.` : "Wybierz tier, aby uwzględnić zakres strony i wycenić skalowane elementy.";
+  $("#tier-details").textContent = result.tier ? `${result.tier.detail}. Projekt: ${formatNumber(result.tier.design[0])}–${formatNumber(result.tier.design[1])} h; bazowe wdrożenie: ${formatNumber(result.tier.development[0])}–${formatNumber(result.tier.development[1])} h. Mnożnik animacji, języków i QA: ×${formatNumber(result.tier.scale)}; handoffu: ×${new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 }).format(result.tier.handoffScale)} względem tieru 4.` : "Wybierz tier, aby uwzględnić zakres strony i wycenić skalowane elementy.";
   $("#tier-summary").textContent = result.tier ? `Tier: ${result.tier.label}` : "Tier strony: nie wybrano";
   $("#include-development").disabled = mode === "external";
   document.querySelectorAll("[data-item-hours]").forEach(element => {
     const item = allItems.find(entry => entry[0] === element.dataset.itemHours);
-    if (!item[0].startsWith("animation-") && item[0] !== "qa") return;
+    if (!item[0].startsWith("animation-") && item[0] !== "qa" && !item[0].startsWith("handoff-")) return;
     if (!result.tier) { element.textContent = "Wybierz tier"; return; }
     const range = getItemRange(item, result.tier);
     element.textContent = `${formatNumber(range.min)}${range.min === range.max ? "" : `–${formatNumber(range.max)}`} h`;
@@ -94,7 +94,7 @@ function update() {
   $("#input-error").hidden = valid;
   $("#input-error").textContent = result.errors.join(" ");
   const warnings = getWarnings(selected, plans, hosting, result.languages, result.completedComponents);
-  if (!result.tier) warnings.unshift("Nie wybrano tieru strony: projekt, baza, animacje, języki i końcowe QA nie są uwzględnione.");
+  if (!result.tier) warnings.unshift("Nie wybrano tieru strony: projekt, baza, animacje, języki, końcowe QA i handoff nie są uwzględnione.");
   if (result.incompleteComponents) warnings.unshift(`Nieuzupełnione pozycje animacji lub CMS: ${result.incompleteComponents}. Nie są doliczone — wpisz nazwę lub usuń pozycję.`);
   if (![...selected].some(id => id.startsWith("cms-"))) warnings.unshift("Nie określono zakresu CMS. Wybierz również „Strona bez CMS”, jeśli nie jest potrzebny.");
   if (![...selected].some(id => id.startsWith("animation-"))) warnings.unshift("Nie określono poziomu animacji. Wybierz również „Bez animacji”, jeśli nie są potrzebne.");

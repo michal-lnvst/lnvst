@@ -13,15 +13,15 @@ export const interactiveTypes = [
 ];
 
 export const projectTiers = [
-  { id: "landing", label: "Landing", detail: "Jeden widok, do 6 sekcji", design: [14, 24.5], development: [7.2, 14.4], scale: 1 },
-  { id: "landing-long", label: "Rozbudowany landing", detail: "Jeden widok, 7–12 sekcji", design: [21, 35], development: [13.2, 24], scale: 1.25 },
-  { id: "company-small", label: "Mała strona firmowa", detail: "2–3 unikalne widoki", design: [24.5, 42], development: [16.8, 30], scale: 1.5 },
-  { id: "company", label: "Rozbudowana strona firmowa", detail: "4–7 unikalnych widoków", design: [31.5, 56], development: [21, 39], scale: 2 },
-  { id: "service", label: "Serwis", detail: "8–12 unikalnych widoków i szablonów", design: [63, 105], development: [36, 66], scale: 2.5 }
+  { id: "landing", label: "Landing", detail: "Jeden widok, do 6 sekcji", design: [14, 24.5], development: [7.25, 14.5], scale: 1, handoffScale: 0.25 },
+  { id: "landing-long", label: "Rozbudowany landing", detail: "Jeden widok, 7–12 sekcji", design: [21, 35], development: [13.25, 24], scale: 1.25, handoffScale: 0.375 },
+  { id: "company-small", label: "Mała strona firmowa", detail: "2–3 unikalne widoki", design: [24.5, 42], development: [16.75, 30], scale: 1.5, handoffScale: 0.75 },
+  { id: "company", label: "Rozbudowana strona firmowa", detail: "4–7 unikalnych widoków", design: [31.5, 56], development: [21, 39], scale: 2, handoffScale: 1 },
+  { id: "service", label: "Serwis", detail: "8–12 unikalnych widoków i szablonów", design: [63, 105], development: [36, 66], scale: 2.5, handoffScale: 1.25 }
 ];
 
 export const groups = [
-  { title: "Handoff i design QA", description: "Nasza praca przy wdrożeniu przez zewnętrzny zespół.", external: true, items: [
+  { title: "Handoff i design QA", description: "Nasza praca przy wdrożeniu przez zewnętrzny zespół; godziny zależą od tieru strony.", external: true, items: [
     ["handoff-components", "Komponentowanie i przygotowanie pliku", "Porządkowanie i stany do przekazania", 6, 14],
     ["handoff-interactions", "Projekt i opis interakcji", "Specyfikacja zachowań i stanów", 4, 12],
     ["handoff-prototype", "Prototypowanie", "Istotne przepływy i zachowania", 3, 10],
