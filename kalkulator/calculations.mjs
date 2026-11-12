@@ -6,17 +6,23 @@ export function getItemRange(item, tier) {
   return { min: Math.round(item[3] * factor * 4) / 4, max: Math.round(item[4] * factor * 4) / 4 };
 }
 
+export function getLanguageUnitRange(hosting, tier) {
+  if (!["webflow", "export"].includes(hosting)) throw new Error(`Nieznany hosting: ${hosting}`);
+  const scale = tier ? tier.scale : 0;
+  return { min: (hosting === "webflow" ? 1 : 2) * scale, max: (hosting === "webflow" ? 4 : 8) * scale };
+}
+
 export function calculate(selected, plans, rateText, adjustmentText, hosting = "webflow", languagesText = "0", components = [], mode = "internal", quantities = {}, tierId = "", includeDesign = true, includeDevelopment = true) {
   if (!["webflow", "export"].includes(hosting)) throw new Error(`Nieznany hosting: ${hosting}`);
   if (!["internal", "external"].includes(mode)) throw new Error(`Nieznany wykonawca: ${mode}`);
   const tier = projectTiers.find(entry => entry.id === tierId);
   if (tierId && !tier) throw new Error(`Nieznany tier strony: ${tierId}`);
-  const scale = tier ? tier.scale : 0;
   const items = allItems.filter(([id]) => selected.has(id));
   const languages = languagesText.trim() === "" ? NaN : Number(languagesText);
   const validLanguages = Number.isSafeInteger(languages) && languages >= 0 && languages <= 100;
-  const languageMin = validLanguages ? languages * (hosting === "webflow" ? 2 : 4) * scale : 0;
-  const languageMax = validLanguages ? languages * (hosting === "webflow" ? 8 : 16) * scale : 0;
+  const languageUnit = getLanguageUnitRange(hosting, tier);
+  const languageMin = validLanguages ? languages * languageUnit.min : 0;
+  const languageMax = validLanguages ? languages * languageUnit.max : 0;
   const componentErrors = components.some(component => !["animation", "cms"].includes(component.category) ||
     typeof component.name !== "string" || !Object.hasOwn(complexityLevels, component.level));
   const completedComponents = components.filter(component => typeof component.name === "string" && component.name.trim() && Object.hasOwn(complexityLevels, component.level) && ["animation", "cms"].includes(component.category));
@@ -68,7 +74,7 @@ export function calculate(selected, plans, rateText, adjustmentText, hosting = "
     if (option.price === null) unknownCosts.push(service.label);
     else monthly[option.currency] += option.price;
   }
-  return { items, components, completedComponents, incompleteComponents, tier, componentMin, componentMax, design, handoff, development, interactive, languages, languageMin, languageMax, rawMin, rawMax, min: rawMin + adjustment, max: rawMax + adjustment, rate, monthly, unknownCosts, errors };
+  return { items, components, completedComponents, incompleteComponents, tier, componentMin, componentMax, design, handoff, development, interactive, languages, languageUnit, languageMin, languageMax, rawMin, rawMax, min: rawMin + adjustment, max: rawMax + adjustment, rate, monthly, unknownCosts, errors };
 }
 
 export function getWarnings(selected, plans, hosting = "webflow", languages = 0, components = []) {

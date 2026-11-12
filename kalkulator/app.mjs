@@ -59,7 +59,7 @@ function update() {
   const result = calculate(selected, plans, rate, adjustment, hosting, $("#languages").value, components, mode, quantities, $("#project-tier").value, $("#include-design").checked, $("#include-development").checked);
   if ($("#rate").validity.badInput || $("#adjustment").validity.badInput || $("#languages").validity.badInput || [...document.querySelectorAll("[data-quantity]")].some(input => input.validity.badInput)) result.errors.push("Podaj poprawne wartości liczbowe.");
   const valid = result.errors.length === 0;
-  const languageUnit = result.tier ? `${formatNumber((hosting === "webflow" ? 2 : 4) * result.tier.scale)}–${formatNumber((hosting === "webflow" ? 8 : 16) * result.tier.scale)} h` : "wybierz tier strony";
+  const languageUnit = result.tier ? `${formatNumber(result.languageUnit.min)}–${formatNumber(result.languageUnit.max)} h` : "wybierz tier strony";
   $("#language-estimate").textContent = `${hosting === "webflow" ? "Webflow Localization (tłumaczenie maszynowe)" : "Ręczne wdrożenie po eksporcie"}: ${languageUnit} za każdą dodatkową wersję.`;
   $("#tier-details").textContent = result.tier ? `${result.tier.detail}. Projekt: ${formatNumber(result.tier.design[0])}–${formatNumber(result.tier.design[1])} h; bazowe wdrożenie: ${formatNumber(result.tier.development[0])}–${formatNumber(result.tier.development[1])} h. Mnożnik animacji, języków i QA: ×${formatNumber(result.tier.scale)}; handoffu: ×${new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 3 }).format(result.tier.handoffScale)} względem tieru 4.` : "Wybierz tier, aby uwzględnić zakres strony i wycenić skalowane elementy.";
   $("#tier-summary").textContent = result.tier ? `Tier: ${result.tier.label}` : "Tier strony: nie wybrano";

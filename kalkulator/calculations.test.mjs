@@ -18,8 +18,8 @@ test("pięć tierów dolicza projekt, bazę oraz właściwie skaluje animacje, j
     const result = calculate(new Set(["animation-scroll", "qa", "form-native"]), noPlans, "", "0", "webflow", "2", [], "internal", {}, id);
     assert.deepEqual(result.design, { min: design[0], max: design[1] }, id);
     const qa = Math.round(1.5 * factor * 4) / 4;
-    assert.deepEqual(result.development, { min: development[0] + 10 * factor + qa + 2, max: development[1] + 30 * factor + qa + 3 }, id);
-    assert.deepEqual([result.languageMin, result.languageMax], [4 * factor, 16 * factor], id);
+    assert.deepEqual(result.development, { min: development[0] + 8 * factor + qa + 2, max: development[1] + 22 * factor + qa + 3 }, id);
+    assert.deepEqual([result.languageMin, result.languageMax], [2 * factor, 8 * factor], id);
     const exclude = calculate(new Set(), noPlans, "", "0", "webflow", "0", [], "internal", {}, id, false, false);
     assert.deepEqual([exclude.min, exclude.max], [0, 0], id);
   }
@@ -43,9 +43,9 @@ test("serwis skaluje każdy poziom animacji, oba warianty języków i QA bez zmi
   }
   const extra = [{ category: "animation", name: "Hero", level: "advanced" }];
   const webflow = calculate(new Set(["qa"]), noPlans, "", "0", "webflow", "2", extra, "internal", {}, "service", false, false);
-  assert.deepEqual([webflow.languageMin, webflow.languageMax, webflow.componentMin, webflow.componentMax, webflow.min, webflow.max], [10, 40, 10, 20, 23.75, 63.75]);
+  assert.deepEqual([webflow.languageMin, webflow.languageMax, webflow.componentMin, webflow.componentMax, webflow.min, webflow.max], [5, 20, 10, 20, 18.75, 43.75]);
   const exported = calculate(new Set(["qa"]), noPlans, "", "0", "export", "2", extra, "internal", {}, "service", false, false);
-  assert.deepEqual([exported.languageMin, exported.languageMax, exported.min, exported.max], [20, 80, 33.75, 103.75]);
+  assert.deepEqual([exported.languageMin, exported.languageMax, exported.min, exported.max], [10, 40, 23.75, 63.75]);
   const designOnly = calculate(new Set(), noPlans, "", "0", "webflow", "0", [], "internal", {}, "service", true, false);
   assert.deepEqual([designOnly.min, designOnly.max], [63, 105]);
   const baseOnly = calculate(new Set(), noPlans, "", "0", "webflow", "0", [], "internal", {}, "service", false, true);
@@ -75,7 +75,7 @@ test("tryb zewnętrzny zachowuje zakres i koszty, dolicza projekt i handoff, wyk
   const external = calculate(selected, plans, "200", "-2", "export", "2", components, "external", quantities, "landing");
   assert.deepEqual(external.design, { min: 18, max: 32.5 });
   assert.deepEqual(external.handoff, { min: 3, max: 7 });
-  assert.deepEqual(external.development, { min: 68.25, max: 160.5 });
+  assert.deepEqual(external.development, { min: 64.25, max: 144.5 });
   assert.deepEqual([external.rawMin, external.rawMax, external.min, external.max], [21, 39.5, 19, 37.5]);
   assert.deepEqual([external.min * external.rate, external.max * external.rate], [3800, 7500]);
   assert.deepEqual(external.monthly, { PLN: 0, USD: 25 });
@@ -83,7 +83,7 @@ test("tryb zewnętrzny zachowuje zakres i koszty, dolicza projekt i handoff, wyk
   assert.deepEqual(external.errors, []);
   const internal = calculate(selected, plans, "200", "-2", "export", "2", components, "internal", quantities, "landing");
   assert.deepEqual(internal.handoff, { min: 0, max: 0 });
-  assert.deepEqual([internal.rawMin, internal.rawMax, internal.min, internal.max], [86.25, 193, 84.25, 191]);
+  assert.deepEqual([internal.rawMin, internal.rawMax, internal.min, internal.max], [82.25, 177, 80.25, 175]);
   assert.deepEqual(calculate(selected, plans, "200", "-2", "export", "2", components, "external", quantities, "landing"), external);
   assert.throws(() => calculate(selected, plans, "", "", "export", "0", [], "invalid"));
 });
@@ -207,11 +207,30 @@ test("sygnalizuje ograniczenia planów oraz nieznane koszty", () => {
 test("dolicza każdą dodatkową wersję językową według hostingu", () => {
   const selected = new Set(["google-maps"]);
   const webflow = calculate(selected, noPlans, "200", "-1", "webflow", "2", [], "internal", {}, "landing", false, false);
-  assert.deepEqual([webflow.languageMin, webflow.languageMax, webflow.min, webflow.max], [4, 16, 3.75, 15.75]);
+  assert.deepEqual([webflow.languageMin, webflow.languageMax, webflow.min, webflow.max], [2, 8, 1.75, 7.75]);
   const exported = calculate(selected, noPlans, "200", "-1", "export", "2", [], "internal", {}, "landing", false, false);
-  assert.deepEqual([exported.languageMin, exported.languageMax, exported.min, exported.max], [8, 32, 7.75, 31.75]);
-  assert.equal(exported.min * exported.rate, 1550);
+  assert.deepEqual([exported.languageMin, exported.languageMax, exported.min, exported.max], [4, 16, 3.75, 15.75]);
+  assert.equal(exported.min * exported.rate, 750);
   assert.deepEqual(calculate(selected, noPlans, "", "0", "export", "0").errors, []);
+});
+
+test("połowa czasu języków dotyczy każdego tieru, hostingu i liczby wersji", () => {
+  const tiers = [["landing", 1], ["landing-long", 1.25], ["company-small", 1.5], ["company", 2], ["service", 2.5]];
+  for (const [tier, scale] of tiers) {
+    for (const [hosting, min, max] of [["webflow", 1, 4], ["export", 2, 8]]) {
+      for (const count of [0, 1, 3, 100]) {
+        const result = calculate(new Set(), noPlans, "200", "0", hosting, String(count), [], "internal", {}, tier, false, false);
+        assert.deepEqual(result.languageUnit, { min: min * scale, max: max * scale });
+        assert.deepEqual([result.min, result.max], [min * scale * count, max * scale * count]);
+        assert.deepEqual([result.min * result.rate, result.max * result.rate], [min * scale * count * 200, max * scale * count * 200]);
+        const external = calculate(new Set(), noPlans, "", "0", hosting, String(count), [], "external", {}, tier, false, false);
+        assert.deepEqual([external.min, external.max], [0, 0]);
+        assert.deepEqual([external.languageMin, external.languageMax], [min * scale * count, max * scale * count]);
+      }
+    }
+  }
+  const noTier = calculate(new Set(), noPlans, "", "0", "webflow", "3");
+  assert.deepEqual([noTier.languageMin, noTier.languageMax], [0, 0]);
 });
 
 test("sprawdza liczbę języków i wariant hostingu", () => {
