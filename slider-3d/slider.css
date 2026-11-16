@@ -4,25 +4,53 @@
 
 body {
   margin: 0;
-  background: #f7f8fa;
-  color: #1b1d1f;
+  background: #080016;
+  color: #fff;
   font-family: Geist, system-ui, -apple-system, sans-serif;
   line-height: 1.55;
 }
 
 .demo {
-  max-width: 1600px;
+  min-height: 100vh;
   margin: 0 auto;
-  padding: 64px 16px;
-  text-align: center;
+  padding: clamp(56px, 7vw, 112px) 0;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 18% 22%, #5100ff 0%, #280079 28%, #12002f 58%, #050009 100%);
 }
 
-.demo h1 {
-  margin: 0 0 12px;
+.intro {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 560px);
+  gap: clamp(24px, 4vw, 64px);
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 clamp(24px, 4vw, 64px);
+}
+
+.intro__marker {
+  width: 18px;
+  height: 18px;
+  margin-top: .5em;
+  background: #fff;
+}
+
+.intro h1 {
+  margin: 0 0 32px;
+  font-size: clamp(2rem, 3.5vw, 3.5rem);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -.03em;
+}
+
+.intro p {
+  max-width: 550px;
+  margin: 0;
+  font-size: clamp(.9rem, 1.1vw, 1rem);
 }
 
 .carousel {
-  margin-top: 40px;
+  max-width: 1600px;
+  margin: 48px auto 0;
 }
 
 .carousel__stage {
@@ -40,11 +68,11 @@ body {
   flex-direction: column;
   width: min(86vw, 420px);
   min-height: 320px;
-  padding: clamp(20px, 2.5vw, 36px);
-  border: 1px solid #e2e5e8;
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 12px 30px rgb(27 29 31 / 12%);
+  padding: clamp(20px, 2vw, 28px);
+  border: 0;
+  border-radius: 0;
+  background: #fdfdfd;
+  color: #000;
   text-align: left;
   overflow-wrap: anywhere;
   transition: transform 300ms ease;
@@ -57,27 +85,29 @@ body {
 
 .carousel__top {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 56px;
 }
 
-.carousel__card h2 {
+.carousel__card h2,
+.carousel__number {
   margin: 0;
-  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  padding: 3px 6px;
+  background: #000;
+  color: #fff;
+  font-family: "Geist Mono", "Courier New", monospace;
+  font-size: .875rem;
+  font-weight: 400;
+  line-height: 1.4;
 }
 
 .carousel__card p {
-  margin: 0;
-  color: #4a4f55;
+  margin: auto 0 0;
+  color: #1a1a1a;
   font-size: clamp(.875rem, 1vw, 1rem);
-}
-
-.carousel__number {
-  color: #5100ff;
-  font-size: .85rem;
-  font-weight: bold;
+  line-height: 1.5;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -88,10 +118,33 @@ body {
 
 @media (max-width: 480px) {
   .demo {
-    padding: 36px 8px;
+    padding: 48px 0;
+  }
+
+  .intro {
+    grid-template-columns: 12px minmax(0, 1fr);
+    gap: 20px;
+    padding: 0 20px;
+  }
+
+  .intro__marker {
+    width: 12px;
+    height: 12px;
+  }
+
+  .intro h1 {
+    margin-bottom: 24px;
+  }
+
+  .carousel {
+    margin-top: 24px;
   }
 
   .carousel__card {
     min-height: 0;
+  }
+
+  .carousel__top {
+    margin-bottom: 32px;
   }
 }
