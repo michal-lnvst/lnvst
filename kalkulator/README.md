@@ -12,7 +12,7 @@ node -e "require('express')().use(require('express').static('kalkulator')).liste
 
 Otwórz `http://127.0.0.1:4173/`. Przeglądarka może blokować moduły JavaScript przy bezpośrednim otwarciu pliku `index.html`. Serwer jest potrzebny tylko do podania plików, a nie do obliczeń.
 
-Workflow `.github/workflows/calculator-pages.yml` publikuje wyłącznie zawartość katalogu `kalkulator` na GitHub Pages po zmianach w tym katalogu na gałęzi `main`. W ustawieniach repozytorium **Settings → Pages → Build and deployment → Source** wybierz **GitHub Actions**. Workflow można też uruchomić ręcznie z zakładki Actions. Publikacja z prywatnego repozytorium wymaga planu GitHub obsługującego GitHub Pages dla prywatnych repozytoriów.
+Workflow `.github/workflows/calculator-pages.yml` publikuje zawartość katalogu `kalkulator` w katalogu głównym GitHub Pages, a przykład z `slider-3d` pod ścieżką `/slider-3d/`. Uruchamia się po zmianach w tych katalogach na gałęzi `main`. W ustawieniach repozytorium **Settings → Pages → Build and deployment → Source** wybierz **GitHub Actions**. Workflow można też uruchomić ręcznie z zakładki Actions. Publikacja z prywatnego repozytorium wymaga planu GitHub obsługującego GitHub Pages dla prywatnych repozytoriów.
 
 Aplikacja nie wymaga backendu ani zmiennych środowiskowych. **GitHub Pages może być publiczny nawet dla prywatnego repozytorium**: nie umieszczaj w aplikacji poufnych stawek ani danych klientów. Stawka wpisana w przeglądarce nie jest wysyłana przez aplikację ani zapisywana; odświeżenie resetuje wybór.
 

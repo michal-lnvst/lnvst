@@ -1,10 +1,11 @@
-name: Deploy calculator to GitHub Pages
+name: Deploy calculator and slider to GitHub Pages
 
 on:
   push:
     branches: [main]
     paths:
       - 'kalkulator/**'
+      - 'slider-3d/**'
       - '.github/workflows/calculator-pages.yml'
   workflow_dispatch:
 
@@ -28,10 +29,15 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-      - name: Upload calculator
+      - name: Prepare Pages content
+        run: |
+          mkdir -p "$RUNNER_TEMP/pages/slider-3d"
+          cp -a kalkulator/. "$RUNNER_TEMP/pages/"
+          cp -a slider-3d/. "$RUNNER_TEMP/pages/slider-3d/"
+      - name: Upload Pages content
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./kalkulator
-      - name: Deploy calculator
+          path: ${{ runner.temp }}/pages
+      - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v4
