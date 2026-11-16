@@ -34,7 +34,7 @@
       const brightness = active ? 1 : 0.72 + depth * 0.28;
 
       card.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale}) rotateY(${rotation}deg)`;
-      card.style.filter = `brightness(${brightness})`;
+      card.style.filter = `brightness(${brightness}) invert(${active ? 1 : 0})`;
       card.style.zIndex = active ? '1001' : String(Math.round(depth * 1000));
     });
   }
