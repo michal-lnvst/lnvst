@@ -29,10 +29,12 @@
       const x = Math.sin(position) * radius;
       const active = card === activeCard;
       const scale = active ? 1 : 0.65 + depth * 0.35;
-      const rotation = active ? 0 : Math.sin(position) * 25;
+      const rotation = active ? 0 : Math.sin(position) * Math.cos(position) * 50;
       const y = (depth - 1) * 110;
+      const brightness = active ? 1 : 0.72 + depth * 0.28;
 
       card.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${scale}) rotateY(${rotation}deg)`;
+      card.style.filter = `brightness(${brightness})`;
       card.style.zIndex = active ? '1001' : String(Math.round(depth * 1000));
     });
   }
@@ -91,6 +93,7 @@
   });
   reducedMotion.addEventListener('change', schedule);
 
+  focusedCard = cards.find((card) => card === document.activeElement) || null;
   resize();
   schedule();
 })();

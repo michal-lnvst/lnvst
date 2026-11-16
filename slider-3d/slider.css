@@ -75,7 +75,7 @@ body {
   color: #000;
   text-align: left;
   overflow-wrap: anywhere;
-  transition: transform 300ms ease;
+  transition: transform 300ms ease, filter 300ms ease;
 }
 
 .carousel__card:focus-visible {
